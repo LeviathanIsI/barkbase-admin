@@ -1,0 +1,26 @@
+{
+  "name": "barkbase-ops-infrastructure",
+  "version": "1.0.0",
+  "description": "BarkBase Ops Center CDK Infrastructure",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk",
+    "synth": "cdk synth -c env=dev",
+    "deploy:dev": "cdk deploy --all -c env=dev --require-approval never",
+    "deploy:prod": "cdk deploy --all -c env=prod --require-approval never",
+    "diff:dev": "cdk diff --all -c env=dev",
+    "destroy:dev": "cdk destroy --all -c env=dev"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.231.0",
+    "constructs": "^10.4.3",
+    "esbuild": "^0.27.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "aws-cdk": "^2.231.0"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "barkbase-ops-layer",
+  "version": "1.0.0",
+  "description": "Shared utilities for BarkBase Ops Lambda functions",
+  "dependencies": {
+    "pg": "^8.13.0",
+    "@aws-sdk/client-secrets-manager": "^3.700.0",
+    "jsonwebtoken": "^9.0.2",
+    "jwks-rsa": "^3.1.0"
+  }
+}
