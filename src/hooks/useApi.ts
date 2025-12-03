@@ -4,6 +4,12 @@ import type {
   CreateIncidentInput,
   UpdateIncidentInput,
   CreateIncidentUpdateInput,
+  CreateMaintenanceInput,
+  UpdateMaintenanceInput,
+  CreateBroadcastInput,
+  UpdateBroadcastInput,
+  CreateFeatureFlagInput,
+  UpdateFeatureFlagInput,
 } from '@/types';
 
 // Query keys
@@ -20,6 +26,13 @@ export const queryKeys = {
   healthDatabase: ['health', 'database'] as const,
   healthAlerts: ['health', 'alerts'] as const,
   auditLogs: (params?: Record<string, unknown>) => ['audit-logs', params] as const,
+  maintenance: ['maintenance'] as const,
+  maintenanceItem: (id: string) => ['maintenance', id] as const,
+  broadcasts: ['broadcasts'] as const,
+  broadcast: (id: string) => ['broadcast', id] as const,
+  activeBroadcasts: ['broadcasts', 'active'] as const,
+  featureFlags: ['feature-flags'] as const,
+  featureFlag: (id: string) => ['feature-flag', id] as const,
 };
 
 // Support hooks
@@ -196,5 +209,180 @@ export function useStatusBanner() {
     queryKey: queryKeys.statusBanner,
     queryFn: () => api.getStatusBanner(),
     refetchInterval: 60000,
+  });
+}
+
+// Maintenance hooks
+export function useMaintenanceList() {
+  return useQuery({
+    queryKey: queryKeys.maintenance,
+    queryFn: () => api.getMaintenanceList(),
+  });
+}
+
+export function useMaintenance(id: string) {
+  return useQuery({
+    queryKey: queryKeys.maintenanceItem(id),
+    queryFn: () => api.getMaintenance(id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateMaintenance() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateMaintenanceInput) => api.createMaintenance(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenance });
+      queryClient.invalidateQueries({ queryKey: queryKeys.status });
+    },
+  });
+}
+
+export function useUpdateMaintenance(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: UpdateMaintenanceInput) => api.updateMaintenance(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenance });
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceItem(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.status });
+    },
+  });
+}
+
+export function useDeleteMaintenance() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteMaintenance(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenance });
+      queryClient.invalidateQueries({ queryKey: queryKeys.status });
+    },
+  });
+}
+
+// Broadcast hooks
+export function useBroadcasts() {
+  return useQuery({
+    queryKey: queryKeys.broadcasts,
+    queryFn: () => api.getBroadcasts(),
+  });
+}
+
+export function useBroadcast(id: string) {
+  return useQuery({
+    queryKey: queryKeys.broadcast(id),
+    queryFn: () => api.getBroadcast(id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateBroadcast() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateBroadcastInput) => api.createBroadcast(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.broadcasts });
+    },
+  });
+}
+
+export function useUpdateBroadcast(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: UpdateBroadcastInput) => api.updateBroadcast(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.broadcasts });
+      queryClient.invalidateQueries({ queryKey: queryKeys.broadcast(id) });
+    },
+  });
+}
+
+export function useDeleteBroadcast() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteBroadcast(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.broadcasts });
+    },
+  });
+}
+
+export function useActiveBroadcasts() {
+  return useQuery({
+    queryKey: queryKeys.activeBroadcasts,
+    queryFn: () => api.getActiveBroadcasts(),
+    refetchInterval: 60000,
+  });
+}
+
+// Feature flag hooks
+export function useFeatureFlags() {
+  return useQuery({
+    queryKey: queryKeys.featureFlags,
+    queryFn: () => api.getFeatureFlags(),
+  });
+}
+
+export function useFeatureFlag(id: string) {
+  return useQuery({
+    queryKey: queryKeys.featureFlag(id),
+    queryFn: () => api.getFeatureFlag(id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateFeatureFlag() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateFeatureFlagInput) => api.createFeatureFlag(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlags });
+    },
+  });
+}
+
+export function useUpdateFeatureFlag(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: UpdateFeatureFlagInput) => api.updateFeatureFlag(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlags });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlag(id) });
+    },
+  });
+}
+
+export function useDeleteFeatureFlag() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteFeatureFlag(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlags });
+    },
+  });
+}
+
+export function useAddFeatureFlagOverride(flagId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tenantId, isEnabled }: { tenantId: string; isEnabled: boolean }) =>
+      api.addFeatureFlagOverride(flagId, tenantId, isEnabled),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlag(flagId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlags });
+    },
+  });
+}
+
+export function useRemoveFeatureFlagOverride(flagId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (overrideId: string) => api.removeFeatureFlagOverride(flagId, overrideId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlag(flagId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlags });
+    },
   });
 }

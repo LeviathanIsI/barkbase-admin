@@ -9,6 +9,8 @@
  * - POST /admin/tenants/{id}/unsuspend - Unsuspend tenant
  * - POST /admin/tenants/{id}/extend-trial - Extend trial period
  * - POST /admin/tenants/{id}/users/{userId}/reset-password - Reset user password
+ * - POST /admin/tenants/{id}/impersonate/start - Start impersonation
+ * - POST /admin/tenants/{id}/impersonate/end - End impersonation
  * - GET /admin/incidents - List incidents
  * - POST /admin/incidents - Create incident
  * - GET /admin/incidents/{id} - Get incident details
@@ -16,6 +18,16 @@
  * - POST /admin/incidents/{id}/updates - Add incident update
  * - GET /admin/health/* - Health monitoring endpoints
  * - GET /admin/audit-logs - Audit log viewer
+ * - GET/POST /admin/maintenance - Scheduled maintenance
+ * - GET/PUT/DELETE /admin/maintenance/{id}
+ * - GET/POST /admin/broadcasts - Broadcast messages
+ * - GET/PUT/DELETE /admin/broadcasts/{id}
+ * - GET/POST /admin/feature-flags - Feature flags
+ * - GET/PUT/DELETE /admin/feature-flags/{id}
+ * - POST/DELETE /admin/feature-flags/{id}/overrides
+ * - GET /status/broadcasts - Public active broadcasts
+ * - GET /status/maintenance - Public upcoming maintenance
+ * - GET /api/features?tenant_id={id} - Public feature flags for tenant
  */
 
 const { opsQuery, barkbaseQuery, authenticateRequest, canWriteIncidents, getClientIp } = require('/opt/nodejs/index');
@@ -114,6 +126,110 @@ exports.handler = async (event, context) => {
     // Audit log routes
     if (path === '/admin/audit-logs') {
       return await handleAuditLogs(event, user);
+    }
+
+    // Impersonation routes
+    if (path.match(/^\/admin\/tenants\/[^/]+\/impersonate\/start$/)) {
+      if (method === 'POST') {
+        return await handleImpersonateStart(event, user, clientIp);
+      }
+    }
+
+    if (path.match(/^\/admin\/tenants\/[^/]+\/impersonate\/end$/)) {
+      if (method === 'POST') {
+        return await handleImpersonateEnd(event, user, clientIp);
+      }
+    }
+
+    // Maintenance routes
+    if (path === '/admin/maintenance') {
+      if (method === 'GET') {
+        return await handleListMaintenance(event, user);
+      }
+      if (method === 'POST') {
+        return await handleCreateMaintenance(event, user, clientIp);
+      }
+    }
+
+    if (path.match(/^\/admin\/maintenance\/[^/]+$/)) {
+      if (method === 'GET') {
+        return await handleGetMaintenance(event, user);
+      }
+      if (method === 'PUT') {
+        return await handleUpdateMaintenance(event, user, clientIp);
+      }
+      if (method === 'DELETE') {
+        return await handleDeleteMaintenance(event, user, clientIp);
+      }
+    }
+
+    // Broadcast routes
+    if (path === '/admin/broadcasts') {
+      if (method === 'GET') {
+        return await handleListBroadcasts(event, user);
+      }
+      if (method === 'POST') {
+        return await handleCreateBroadcast(event, user, clientIp);
+      }
+    }
+
+    if (path.match(/^\/admin\/broadcasts\/[^/]+$/)) {
+      if (method === 'GET') {
+        return await handleGetBroadcast(event, user);
+      }
+      if (method === 'PUT') {
+        return await handleUpdateBroadcast(event, user, clientIp);
+      }
+      if (method === 'DELETE') {
+        return await handleDeleteBroadcast(event, user, clientIp);
+      }
+    }
+
+    // Feature flag routes
+    if (path === '/admin/feature-flags') {
+      if (method === 'GET') {
+        return await handleListFeatureFlags(event, user);
+      }
+      if (method === 'POST') {
+        return await handleCreateFeatureFlag(event, user, clientIp);
+      }
+    }
+
+    if (path.match(/^\/admin\/feature-flags\/[^/]+\/overrides\/[^/]+$/)) {
+      if (method === 'DELETE') {
+        return await handleDeleteFeatureFlagOverride(event, user, clientIp);
+      }
+    }
+
+    if (path.match(/^\/admin\/feature-flags\/[^/]+\/overrides$/)) {
+      if (method === 'POST') {
+        return await handleAddFeatureFlagOverride(event, user, clientIp);
+      }
+    }
+
+    if (path.match(/^\/admin\/feature-flags\/[^/]+$/)) {
+      if (method === 'GET') {
+        return await handleGetFeatureFlag(event, user);
+      }
+      if (method === 'PUT') {
+        return await handleUpdateFeatureFlag(event, user, clientIp);
+      }
+      if (method === 'DELETE') {
+        return await handleDeleteFeatureFlag(event, user, clientIp);
+      }
+    }
+
+    // Public routes (no auth required)
+    if (path === '/status/broadcasts') {
+      return await handlePublicBroadcasts(event);
+    }
+
+    if (path === '/status/maintenance') {
+      return await handlePublicMaintenance(event);
+    }
+
+    if (path === '/api/features') {
+      return await handlePublicFeatures(event);
     }
 
     return response(404, { message: 'Not found' });
@@ -894,4 +1010,701 @@ async function logAudit(user, action, targetType, targetId, details, ipAddress =
   } catch (error) {
     console.error('Failed to log audit:', error);
   }
+}
+
+// =========================================================================
+// Impersonation Handlers
+// =========================================================================
+
+async function handleImpersonateStart(event, user, clientIp) {
+  // Only super_admin and support_lead can impersonate
+  if (!['super_admin', 'support_lead'].includes(user.role)) {
+    return response(403, { message: 'You do not have permission to impersonate tenants' });
+  }
+
+  const tenantId = extractPathParam(event.path, '/admin/tenants/', '/impersonate/start');
+  const body = JSON.parse(event.body || '{}');
+  const { reason } = body;
+
+  if (!reason || reason.length < 10) {
+    return response(400, { message: 'Reason is required (minimum 10 characters)' });
+  }
+
+  // Verify tenant exists
+  const tenantResult = await barkbaseQuery(
+    `SELECT id, name FROM "Tenant" WHERE id = $1`,
+    [tenantId]
+  );
+
+  if (tenantResult.rows.length === 0) {
+    return response(404, { message: 'Tenant not found' });
+  }
+
+  const tenant = tenantResult.rows[0];
+
+  // Log the impersonation start
+  await logAudit(user, 'impersonate_start', 'tenant', tenantId, {
+    reason,
+    tenantName: tenant.name,
+  }, clientIp);
+
+  return response(200, { success: true, tenant: { id: tenant.id, name: tenant.name } });
+}
+
+async function handleImpersonateEnd(event, user, clientIp) {
+  const tenantId = extractPathParam(event.path, '/admin/tenants/', '/impersonate/end');
+
+  // Log the impersonation end
+  await logAudit(user, 'impersonate_end', 'tenant', tenantId, null, clientIp);
+
+  return response(200, { success: true });
+}
+
+// =========================================================================
+// Maintenance Handlers
+// =========================================================================
+
+async function handleListMaintenance(event, user) {
+  const result = await opsQuery(
+    `SELECT * FROM scheduled_maintenance ORDER BY scheduled_start DESC`
+  );
+
+  return response(200, {
+    maintenance: result.rows.map(formatMaintenance),
+  });
+}
+
+async function handleGetMaintenance(event, user) {
+  const id = extractPathParam(event.path, '/admin/maintenance/');
+
+  const result = await opsQuery(
+    `SELECT * FROM scheduled_maintenance WHERE id = $1`,
+    [id]
+  );
+
+  if (result.rows.length === 0) {
+    return response(404, { message: 'Maintenance not found' });
+  }
+
+  return response(200, formatMaintenance(result.rows[0]));
+}
+
+async function handleCreateMaintenance(event, user, clientIp) {
+  if (!['super_admin', 'engineer'].includes(user.role)) {
+    return response(403, { message: 'You do not have permission to create maintenance windows' });
+  }
+
+  const body = JSON.parse(event.body);
+  const { title, description, scheduledStart, scheduledEnd, affectedComponents, notifyCustomers } = body;
+
+  if (!title || !scheduledStart || !scheduledEnd) {
+    return response(400, { message: 'Missing required fields' });
+  }
+
+  const result = await opsQuery(
+    `INSERT INTO scheduled_maintenance
+     (title, description, scheduled_start, scheduled_end, affected_components, notify_customers, created_by_id, created_by_email)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING *`,
+    [title, description || null, scheduledStart, scheduledEnd, affectedComponents || [], notifyCustomers ?? true, user.id, user.email]
+  );
+
+  await logAudit(user, 'create_maintenance', 'maintenance', result.rows[0].id, { title }, clientIp);
+
+  return response(201, formatMaintenance(result.rows[0]));
+}
+
+async function handleUpdateMaintenance(event, user, clientIp) {
+  if (!['super_admin', 'engineer'].includes(user.role)) {
+    return response(403, { message: 'You do not have permission to update maintenance windows' });
+  }
+
+  const id = extractPathParam(event.path, '/admin/maintenance/');
+  const body = JSON.parse(event.body);
+  const { title, description, scheduledStart, scheduledEnd, affectedComponents, status, notifyCustomers } = body;
+
+  const updates = [];
+  const params = [];
+  let paramIndex = 1;
+
+  if (title !== undefined) {
+    updates.push(`title = $${paramIndex++}`);
+    params.push(title);
+  }
+  if (description !== undefined) {
+    updates.push(`description = $${paramIndex++}`);
+    params.push(description);
+  }
+  if (scheduledStart !== undefined) {
+    updates.push(`scheduled_start = $${paramIndex++}`);
+    params.push(scheduledStart);
+  }
+  if (scheduledEnd !== undefined) {
+    updates.push(`scheduled_end = $${paramIndex++}`);
+    params.push(scheduledEnd);
+  }
+  if (affectedComponents !== undefined) {
+    updates.push(`affected_components = $${paramIndex++}`);
+    params.push(affectedComponents);
+  }
+  if (status !== undefined) {
+    updates.push(`status = $${paramIndex++}`);
+    params.push(status);
+  }
+  if (notifyCustomers !== undefined) {
+    updates.push(`notify_customers = $${paramIndex++}`);
+    params.push(notifyCustomers);
+  }
+
+  if (updates.length === 0) {
+    return response(400, { message: 'No fields to update' });
+  }
+
+  params.push(id);
+  const result = await opsQuery(
+    `UPDATE scheduled_maintenance SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+    params
+  );
+
+  if (result.rows.length === 0) {
+    return response(404, { message: 'Maintenance not found' });
+  }
+
+  await logAudit(user, 'update_maintenance', 'maintenance', id, body, clientIp);
+
+  return response(200, formatMaintenance(result.rows[0]));
+}
+
+async function handleDeleteMaintenance(event, user, clientIp) {
+  if (!['super_admin', 'engineer'].includes(user.role)) {
+    return response(403, { message: 'You do not have permission to delete maintenance windows' });
+  }
+
+  const id = extractPathParam(event.path, '/admin/maintenance/');
+
+  const result = await opsQuery(
+    `DELETE FROM scheduled_maintenance WHERE id = $1 RETURNING id`,
+    [id]
+  );
+
+  if (result.rows.length === 0) {
+    return response(404, { message: 'Maintenance not found' });
+  }
+
+  await logAudit(user, 'delete_maintenance', 'maintenance', id, null, clientIp);
+
+  return response(200, { success: true });
+}
+
+function formatMaintenance(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    scheduledStart: row.scheduled_start,
+    scheduledEnd: row.scheduled_end,
+    affectedComponents: row.affected_components || [],
+    status: row.status,
+    notifyCustomers: row.notify_customers,
+    createdById: row.created_by_id,
+    createdByEmail: row.created_by_email,
+    createdAt: row.created_at,
+  };
+}
+
+// =========================================================================
+// Broadcast Handlers
+// =========================================================================
+
+async function handleListBroadcasts(event, user) {
+  const result = await opsQuery(
+    `SELECT * FROM broadcasts ORDER BY created_at DESC`
+  );
+
+  return response(200, {
+    broadcasts: result.rows.map(formatBroadcast),
+  });
+}
+
+async function handleGetBroadcast(event, user) {
+  const id = extractPathParam(event.path, '/admin/broadcasts/');
+
+  const result = await opsQuery(
+    `SELECT * FROM broadcasts WHERE id = $1`,
+    [id]
+  );
+
+  if (result.rows.length === 0) {
+    return response(404, { message: 'Broadcast not found' });
+  }
+
+  return response(200, formatBroadcast(result.rows[0]));
+}
+
+async function handleCreateBroadcast(event, user, clientIp) {
+  if (!['super_admin', 'support_lead'].includes(user.role)) {
+    return response(403, { message: 'You do not have permission to create broadcasts' });
+  }
+
+  const body = JSON.parse(event.body);
+  const { title, message, type, target, displayLocations, startsAt, expiresAt } = body;
+
+  if (!title || !message || !type || !displayLocations || displayLocations.length === 0 || !startsAt) {
+    return response(400, { message: 'Missing required fields' });
+  }
+
+  const result = await opsQuery(
+    `INSERT INTO broadcasts
+     (title, message, type, target, display_location, starts_at, expires_at, created_by_id, created_by_email)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     RETURNING *`,
+    [title, message, type, target || 'all', displayLocations, startsAt, expiresAt || null, user.id, user.email]
+  );
+
+  await logAudit(user, 'create_broadcast', 'broadcast', result.rows[0].id, { title, type }, clientIp);
+
+  return response(201, formatBroadcast(result.rows[0]));
+}
+
+async function handleUpdateBroadcast(event, user, clientIp) {
+  if (!['super_admin', 'support_lead'].includes(user.role)) {
+    return response(403, { message: 'You do not have permission to update broadcasts' });
+  }
+
+  const id = extractPathParam(event.path, '/admin/broadcasts/');
+  const body = JSON.parse(event.body);
+  const { title, message, type, target, displayLocations, startsAt, expiresAt, isActive } = body;
+
+  const updates = [];
+  const params = [];
+  let paramIndex = 1;
+
+  if (title !== undefined) {
+    updates.push(`title = $${paramIndex++}`);
+    params.push(title);
+  }
+  if (message !== undefined) {
+    updates.push(`message = $${paramIndex++}`);
+    params.push(message);
+  }
+  if (type !== undefined) {
+    updates.push(`type = $${paramIndex++}`);
+    params.push(type);
+  }
+  if (target !== undefined) {
+    updates.push(`target = $${paramIndex++}`);
+    params.push(target);
+  }
+  if (displayLocations !== undefined) {
+    updates.push(`display_location = $${paramIndex++}`);
+    params.push(displayLocations);
+  }
+  if (startsAt !== undefined) {
+    updates.push(`starts_at = $${paramIndex++}`);
+    params.push(startsAt);
+  }
+  if (expiresAt !== undefined) {
+    updates.push(`expires_at = $${paramIndex++}`);
+    params.push(expiresAt);
+  }
+  if (isActive !== undefined) {
+    updates.push(`is_active = $${paramIndex++}`);
+    params.push(isActive);
+  }
+
+  if (updates.length === 0) {
+    return response(400, { message: 'No fields to update' });
+  }
+
+  params.push(id);
+  const result = await opsQuery(
+    `UPDATE broadcasts SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+    params
+  );
+
+  if (result.rows.length === 0) {
+    return response(404, { message: 'Broadcast not found' });
+  }
+
+  await logAudit(user, 'update_broadcast', 'broadcast', id, body, clientIp);
+
+  return response(200, formatBroadcast(result.rows[0]));
+}
+
+async function handleDeleteBroadcast(event, user, clientIp) {
+  if (!['super_admin', 'support_lead'].includes(user.role)) {
+    return response(403, { message: 'You do not have permission to delete broadcasts' });
+  }
+
+  const id = extractPathParam(event.path, '/admin/broadcasts/');
+
+  const result = await opsQuery(
+    `DELETE FROM broadcasts WHERE id = $1 RETURNING id`,
+    [id]
+  );
+
+  if (result.rows.length === 0) {
+    return response(404, { message: 'Broadcast not found' });
+  }
+
+  await logAudit(user, 'delete_broadcast', 'broadcast', id, null, clientIp);
+
+  return response(200, { success: true });
+}
+
+function formatBroadcast(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    message: row.message,
+    type: row.type,
+    target: row.target,
+    displayLocations: row.display_location || [],
+    startsAt: row.starts_at,
+    expiresAt: row.expires_at,
+    isActive: row.is_active,
+    createdById: row.created_by_id,
+    createdByEmail: row.created_by_email,
+    createdAt: row.created_at,
+  };
+}
+
+// =========================================================================
+// Feature Flag Handlers
+// =========================================================================
+
+async function handleListFeatureFlags(event, user) {
+  const result = await opsQuery(
+    `SELECT f.*, COUNT(o.id) as override_count
+     FROM feature_flags f
+     LEFT JOIN feature_flag_overrides o ON f.id = o.flag_id
+     GROUP BY f.id
+     ORDER BY f.created_at DESC`
+  );
+
+  return response(200, {
+    flags: result.rows.map(row => ({
+      ...formatFeatureFlag(row),
+      overrideCount: parseInt(row.override_count) || 0,
+    })),
+  });
+}
+
+async function handleGetFeatureFlag(event, user) {
+  const id = extractPathParam(event.path, '/admin/feature-flags/');
+
+  const flagResult = await opsQuery(
+    `SELECT * FROM feature_flags WHERE id = $1`,
+    [id]
+  );
+
+  if (flagResult.rows.length === 0) {
+    return response(404, { message: 'Feature flag not found' });
+  }
+
+  const overridesResult = await opsQuery(
+    `SELECT o.*, t.name as tenant_name
+     FROM feature_flag_overrides o
+     LEFT JOIN "Tenant" t ON o.tenant_id::text = t.id::text
+     WHERE o.flag_id = $1
+     ORDER BY o.created_at DESC`,
+    [id]
+  );
+
+  return response(200, {
+    ...formatFeatureFlag(flagResult.rows[0]),
+    overrides: overridesResult.rows.map(row => ({
+      id: row.id,
+      flagId: row.flag_id,
+      tenantId: row.tenant_id,
+      tenantName: row.tenant_name,
+      isEnabled: row.is_enabled,
+      createdAt: row.created_at,
+    })),
+  });
+}
+
+async function handleCreateFeatureFlag(event, user, clientIp) {
+  if (!['super_admin', 'engineer'].includes(user.role)) {
+    return response(403, { message: 'You do not have permission to create feature flags' });
+  }
+
+  const body = JSON.parse(event.body);
+  const { key, name, description, isEnabled, rolloutPercentage } = body;
+
+  if (!key || !name) {
+    return response(400, { message: 'Key and name are required' });
+  }
+
+  // Check for duplicate key
+  const existingResult = await opsQuery(
+    `SELECT id FROM feature_flags WHERE key = $1`,
+    [key]
+  );
+
+  if (existingResult.rows.length > 0) {
+    return response(400, { message: 'Feature flag key already exists' });
+  }
+
+  const result = await opsQuery(
+    `INSERT INTO feature_flags (key, name, description, is_enabled, rollout_percentage)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING *`,
+    [key, name, description || null, isEnabled ?? false, rolloutPercentage ?? 100]
+  );
+
+  await logAudit(user, 'create_feature_flag', 'feature_flag', result.rows[0].id, { key, name }, clientIp);
+
+  return response(201, formatFeatureFlag(result.rows[0]));
+}
+
+async function handleUpdateFeatureFlag(event, user, clientIp) {
+  if (!['super_admin', 'engineer'].includes(user.role)) {
+    return response(403, { message: 'You do not have permission to update feature flags' });
+  }
+
+  const id = extractPathParam(event.path, '/admin/feature-flags/');
+  const body = JSON.parse(event.body);
+  const { name, description, isEnabled, rolloutPercentage } = body;
+
+  const updates = ['updated_at = NOW()'];
+  const params = [];
+  let paramIndex = 1;
+
+  if (name !== undefined) {
+    updates.push(`name = $${paramIndex++}`);
+    params.push(name);
+  }
+  if (description !== undefined) {
+    updates.push(`description = $${paramIndex++}`);
+    params.push(description);
+  }
+  if (isEnabled !== undefined) {
+    updates.push(`is_enabled = $${paramIndex++}`);
+    params.push(isEnabled);
+  }
+  if (rolloutPercentage !== undefined) {
+    updates.push(`rollout_percentage = $${paramIndex++}`);
+    params.push(rolloutPercentage);
+  }
+
+  params.push(id);
+  const result = await opsQuery(
+    `UPDATE feature_flags SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+    params
+  );
+
+  if (result.rows.length === 0) {
+    return response(404, { message: 'Feature flag not found' });
+  }
+
+  await logAudit(user, 'update_feature_flag', 'feature_flag', id, body, clientIp);
+
+  return response(200, formatFeatureFlag(result.rows[0]));
+}
+
+async function handleDeleteFeatureFlag(event, user, clientIp) {
+  if (!['super_admin', 'engineer'].includes(user.role)) {
+    return response(403, { message: 'You do not have permission to delete feature flags' });
+  }
+
+  const id = extractPathParam(event.path, '/admin/feature-flags/');
+
+  const result = await opsQuery(
+    `DELETE FROM feature_flags WHERE id = $1 RETURNING id, key`,
+    [id]
+  );
+
+  if (result.rows.length === 0) {
+    return response(404, { message: 'Feature flag not found' });
+  }
+
+  await logAudit(user, 'delete_feature_flag', 'feature_flag', id, { key: result.rows[0].key }, clientIp);
+
+  return response(200, { success: true });
+}
+
+async function handleAddFeatureFlagOverride(event, user, clientIp) {
+  if (!['super_admin', 'engineer'].includes(user.role)) {
+    return response(403, { message: 'You do not have permission to add overrides' });
+  }
+
+  const flagId = extractPathParam(event.path, '/admin/feature-flags/', '/overrides');
+  const body = JSON.parse(event.body);
+  const { tenantId, isEnabled } = body;
+
+  if (!tenantId || isEnabled === undefined) {
+    return response(400, { message: 'Tenant ID and enabled status are required' });
+  }
+
+  // Verify tenant exists
+  const tenantResult = await barkbaseQuery(
+    `SELECT id, name FROM "Tenant" WHERE id = $1`,
+    [tenantId]
+  );
+
+  if (tenantResult.rows.length === 0) {
+    return response(404, { message: 'Tenant not found' });
+  }
+
+  // Check for existing override
+  const existingResult = await opsQuery(
+    `SELECT id FROM feature_flag_overrides WHERE flag_id = $1 AND tenant_id = $2`,
+    [flagId, tenantId]
+  );
+
+  if (existingResult.rows.length > 0) {
+    // Update existing
+    const result = await opsQuery(
+      `UPDATE feature_flag_overrides SET is_enabled = $1 WHERE flag_id = $2 AND tenant_id = $3 RETURNING *`,
+      [isEnabled, flagId, tenantId]
+    );
+    return response(200, {
+      id: result.rows[0].id,
+      flagId: result.rows[0].flag_id,
+      tenantId: result.rows[0].tenant_id,
+      tenantName: tenantResult.rows[0].name,
+      isEnabled: result.rows[0].is_enabled,
+      createdAt: result.rows[0].created_at,
+    });
+  }
+
+  const result = await opsQuery(
+    `INSERT INTO feature_flag_overrides (flag_id, tenant_id, is_enabled)
+     VALUES ($1, $2, $3)
+     RETURNING *`,
+    [flagId, tenantId, isEnabled]
+  );
+
+  await logAudit(user, 'add_feature_flag_override', 'feature_flag', flagId, { tenantId, isEnabled }, clientIp);
+
+  return response(201, {
+    id: result.rows[0].id,
+    flagId: result.rows[0].flag_id,
+    tenantId: result.rows[0].tenant_id,
+    tenantName: tenantResult.rows[0].name,
+    isEnabled: result.rows[0].is_enabled,
+    createdAt: result.rows[0].created_at,
+  });
+}
+
+async function handleDeleteFeatureFlagOverride(event, user, clientIp) {
+  if (!['super_admin', 'engineer'].includes(user.role)) {
+    return response(403, { message: 'You do not have permission to remove overrides' });
+  }
+
+  // Extract both flagId and overrideId from path
+  const pathParts = event.path.split('/');
+  const flagId = pathParts[3];
+  const overrideId = pathParts[5];
+
+  const result = await opsQuery(
+    `DELETE FROM feature_flag_overrides WHERE id = $1 AND flag_id = $2 RETURNING id`,
+    [overrideId, flagId]
+  );
+
+  if (result.rows.length === 0) {
+    return response(404, { message: 'Override not found' });
+  }
+
+  await logAudit(user, 'remove_feature_flag_override', 'feature_flag', flagId, { overrideId }, clientIp);
+
+  return response(200, { success: true });
+}
+
+function formatFeatureFlag(row) {
+  return {
+    id: row.id,
+    key: row.key,
+    name: row.name,
+    description: row.description,
+    isEnabled: row.is_enabled,
+    rolloutPercentage: row.rollout_percentage,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+// =========================================================================
+// Public Handlers (no auth required)
+// =========================================================================
+
+async function handlePublicBroadcasts(event) {
+  const result = await opsQuery(
+    `SELECT * FROM broadcasts
+     WHERE is_active = true
+     AND starts_at <= NOW()
+     AND (expires_at IS NULL OR expires_at > NOW())
+     AND 'status_page' = ANY(display_location)
+     ORDER BY created_at DESC`
+  );
+
+  return response(200, {
+    broadcasts: result.rows.map(formatBroadcast),
+  });
+}
+
+async function handlePublicMaintenance(event) {
+  const result = await opsQuery(
+    `SELECT * FROM scheduled_maintenance
+     WHERE status IN ('scheduled', 'in_progress')
+     AND scheduled_end > NOW()
+     ORDER BY scheduled_start ASC`
+  );
+
+  return response(200, {
+    maintenance: result.rows.map(formatMaintenance),
+  });
+}
+
+async function handlePublicFeatures(event) {
+  const tenantId = event.queryStringParameters?.tenant_id;
+
+  if (!tenantId) {
+    return response(400, { message: 'tenant_id is required' });
+  }
+
+  // Get all enabled flags
+  const flagsResult = await opsQuery(
+    `SELECT key, is_enabled, rollout_percentage FROM feature_flags WHERE is_enabled = true`
+  );
+
+  // Get overrides for this tenant
+  const overridesResult = await opsQuery(
+    `SELECT f.key, o.is_enabled
+     FROM feature_flag_overrides o
+     JOIN feature_flags f ON o.flag_id = f.id
+     WHERE o.tenant_id = $1`,
+    [tenantId]
+  );
+
+  const overrideMap = new Map(overridesResult.rows.map(r => [r.key, r.is_enabled]));
+
+  // Determine enabled features
+  const enabledFeatures = flagsResult.rows
+    .filter(flag => {
+      // Check override first
+      if (overrideMap.has(flag.key)) {
+        return overrideMap.get(flag.key);
+      }
+      // Check rollout percentage (simple hash-based determination)
+      if (flag.rollout_percentage < 100) {
+        const hash = simpleHash(tenantId + flag.key);
+        return (hash % 100) < flag.rollout_percentage;
+      }
+      return flag.is_enabled;
+    })
+    .map(f => f.key);
+
+  return response(200, { features: enabledFeatures });
+}
+
+function simpleHash(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash);
 }

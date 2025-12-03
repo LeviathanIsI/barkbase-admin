@@ -15,6 +15,10 @@ export const API_ENDPOINTS = {
   userResetPassword: (tenantId: string, userId: string) =>
     `/admin/tenants/${tenantId}/users/${userId}/reset-password`,
 
+  // Impersonation endpoints
+  impersonateStart: (tenantId: string) => `/admin/tenants/${tenantId}/impersonate/start`,
+  impersonateEnd: (tenantId: string) => `/admin/tenants/${tenantId}/impersonate/end`,
+
   // Incident endpoints
   incidents: '/admin/incidents',
   incident: (id: string) => `/admin/incidents/${id}`,
@@ -29,7 +33,24 @@ export const API_ENDPOINTS = {
   // Audit log endpoints
   auditLogs: '/admin/audit-logs',
 
+  // Maintenance endpoints
+  maintenance: '/admin/maintenance',
+  maintenanceItem: (id: string) => `/admin/maintenance/${id}`,
+
+  // Broadcast endpoints
+  broadcasts: '/admin/broadcasts',
+  broadcast: (id: string) => `/admin/broadcasts/${id}`,
+
+  // Feature flags endpoints
+  featureFlags: '/admin/feature-flags',
+  featureFlag: (id: string) => `/admin/feature-flags/${id}`,
+  featureFlagOverrides: (flagId: string) => `/admin/feature-flags/${flagId}/overrides`,
+  featureFlagOverride: (flagId: string, overrideId: string) => `/admin/feature-flags/${flagId}/overrides/${overrideId}`,
+
   // Public status endpoints (no auth)
   status: '/status',
   statusBanner: '/status/banner',
+  statusBroadcasts: '/status/broadcasts',
+  statusMaintenance: '/status/maintenance',
+  publicFeatures: '/api/features',
 } as const;

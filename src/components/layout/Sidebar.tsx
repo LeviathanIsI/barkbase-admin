@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Headphones, AlertTriangle, Activity, Gauge, FileText, LogOut, ExternalLink } from 'lucide-react';
+import { Headphones, AlertTriangle, Activity, Gauge, FileText, LogOut, ExternalLink, Calendar, Megaphone, Flag } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 const navItems = [
@@ -7,6 +7,12 @@ const navItems = [
   { to: '/incidents', label: 'Incidents', icon: AlertTriangle },
   { to: '/command-center', label: 'Command Center', icon: Gauge },
   { to: '/audit-logs', label: 'Audit Logs', icon: FileText },
+];
+
+const configItems = [
+  { to: '/maintenance', label: 'Maintenance', icon: Calendar },
+  { to: '/broadcasts', label: 'Broadcasts', icon: Megaphone },
+  { to: '/feature-flags', label: 'Feature Flags', icon: Flag },
 ];
 
 export function Sidebar() {
@@ -56,6 +62,39 @@ export function Sidebar() {
         </div>
         <ul className="space-y-1">
           {navItems.map(({ to, label, icon: Icon }) => (
+            <li key={to}>
+              <NavLink
+                to={to}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all relative ${
+                    isActive
+                      ? 'bg-[var(--color-brand-subtle)] text-[var(--color-brand-light)]'
+                      : 'text-[var(--text-secondary)] hover:bg-[var(--hover-overlay)] hover:text-[var(--text-primary)]'
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    {isActive && (
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-[var(--color-brand)] rounded-r-full" />
+                    )}
+                    <Icon size={18} className="flex-shrink-0" />
+                    <span>{label}</span>
+                  </>
+                )}
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+
+        {/* Config Section */}
+        <div className="mt-6 mb-2 px-3">
+          <span className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
+            Configuration
+          </span>
+        </div>
+        <ul className="space-y-1">
+          {configItems.map(({ to, label, icon: Icon }) => (
             <li key={to}>
               <NavLink
                 to={to}

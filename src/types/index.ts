@@ -254,6 +254,120 @@ export interface AuditLogResponse {
   filters: AuditLogFilters;
 }
 
+// Scheduled Maintenance types
+export type MaintenanceStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+
+export interface ScheduledMaintenance {
+  id: string;
+  title: string;
+  description?: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  affectedComponents: string[];
+  status: MaintenanceStatus;
+  notifyCustomers: boolean;
+  createdById: string;
+  createdByEmail: string;
+  createdAt: string;
+}
+
+export interface CreateMaintenanceInput {
+  title: string;
+  description?: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  affectedComponents: string[];
+  notifyCustomers?: boolean;
+}
+
+export interface UpdateMaintenanceInput {
+  title?: string;
+  description?: string;
+  scheduledStart?: string;
+  scheduledEnd?: string;
+  affectedComponents?: string[];
+  status?: MaintenanceStatus;
+  notifyCustomers?: boolean;
+}
+
+// Broadcast types
+export type BroadcastType = 'info' | 'warning' | 'critical';
+export type BroadcastTarget = 'all' | 'plan:free' | 'plan:pro' | 'plan:enterprise';
+export type BroadcastLocation = 'app_banner' | 'email' | 'status_page';
+
+export interface Broadcast {
+  id: string;
+  title: string;
+  message: string;
+  type: BroadcastType;
+  target: BroadcastTarget;
+  displayLocations: BroadcastLocation[];
+  startsAt: string;
+  expiresAt?: string;
+  isActive: boolean;
+  createdById: string;
+  createdByEmail: string;
+  createdAt: string;
+}
+
+export interface CreateBroadcastInput {
+  title: string;
+  message: string;
+  type: BroadcastType;
+  target?: BroadcastTarget;
+  displayLocations: BroadcastLocation[];
+  startsAt: string;
+  expiresAt?: string;
+}
+
+export interface UpdateBroadcastInput {
+  title?: string;
+  message?: string;
+  type?: BroadcastType;
+  target?: BroadcastTarget;
+  displayLocations?: BroadcastLocation[];
+  startsAt?: string;
+  expiresAt?: string;
+  isActive?: boolean;
+}
+
+// Feature Flag types
+export interface FeatureFlag {
+  id: string;
+  key: string;
+  name: string;
+  description?: string;
+  isEnabled: boolean;
+  rolloutPercentage: number;
+  createdAt: string;
+  updatedAt: string;
+  overrideCount?: number;
+}
+
+export interface FeatureFlagOverride {
+  id: string;
+  flagId: string;
+  tenantId: string;
+  tenantName?: string;
+  isEnabled: boolean;
+  createdAt: string;
+}
+
+export interface CreateFeatureFlagInput {
+  key: string;
+  name: string;
+  description?: string;
+  isEnabled?: boolean;
+  rolloutPercentage?: number;
+}
+
+export interface UpdateFeatureFlagInput {
+  name?: string;
+  description?: string;
+  isEnabled?: boolean;
+  rolloutPercentage?: number;
+}
+
 // API response types
 export interface PaginatedResponse<T> {
   data: T[];

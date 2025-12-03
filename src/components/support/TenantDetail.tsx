@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { X, Building2, Users, Calendar, Key, Clock, Ban, CheckCircle, Loader2, Activity } from 'lucide-react';
+import { X, Building2, Users, Calendar, Key, Clock, Ban, CheckCircle, Loader2, Activity, Eye } from 'lucide-react';
 import { useSuspendTenant, useUnsuspendTenant, useExtendTrial, useResetUserPassword } from '@/hooks/useApi';
+import { useAuth } from '@/hooks/useAuth';
+import { useImpersonation } from '@/contexts/ImpersonationContext';
+import { ImpersonateModal } from './ImpersonateModal';
 import type { TenantDetail as TenantDetailType, TenantUser } from '@/types';
 
 interface TenantDetailProps {
@@ -15,13 +18,20 @@ type TabType = 'overview' | 'users' | 'activity' | 'actions';
 export function TenantDetail({ tenant, onClose, onRefresh }: TenantDetailProps) {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [showExtendTrialModal, setShowExtendTrialModal] = useState(false);
+  const [showImpersonateModal, setShowImpersonateModal] = useState(false);
   const [trialDays, setTrialDays] = useState(7);
   const [resetPasswordUserId, setResetPasswordUserId] = useState<string | null>(null);
+
+  const { user } = useAuth();
+  const { isImpersonating, impersonatedTenant } = useImpersonation();
 
   const suspendTenant = useSuspendTenant(tenant.id);
   const unsuspendTenant = useUnsuspendTenant(tenant.id);
   const extendTrial = useExtendTrial(tenant.id);
   const resetPassword = useResetUserPassword(tenant.id);
+
+  const canImpersonate = user?.role === 'super_admin' || user?.role === 'support_lead';
+  const isCurrentlyImpersonating = isImpersonating && impersonatedTenant?.id === tenant.id;
 
   const handleSuspend = async () => {
     if (confirm('Are you sure you want to suspend this tenant? All users will lose access.')) {
@@ -88,12 +98,29 @@ export function TenantDetail({ tenant, onClose, onRefresh }: TenantDetailProps) 
               </span>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-md hover:bg-[var(--hover-overlay)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            {canImpersonate && (
+              <button
+                onClick={() => setShowImpersonateModal(true)}
+                disabled={isCurrentlyImpersonating}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  isCurrentlyImpersonating
+                    ? 'bg-[var(--color-warning)] text-black cursor-not-allowed'
+                    : 'bg-[var(--color-warning-soft)] text-[var(--color-warning)] hover:bg-[var(--color-warning)] hover:text-black'
+                }`}
+                title={isCurrentlyImpersonating ? 'Currently impersonating this tenant' : 'Impersonate this tenant'}
+              >
+                <Eye size={14} />
+                {isCurrentlyImpersonating ? 'Impersonating' : 'Impersonate'}
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-md hover:bg-[var(--hover-overlay)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -298,6 +325,14 @@ export function TenantDetail({ tenant, onClose, onRefresh }: TenantDetailProps) 
             </div>
           </div>
         </div>
+      )}
+
+      {/* Impersonate Modal */}
+      {showImpersonateModal && (
+        <ImpersonateModal
+          tenant={{ id: tenant.id, name: tenant.name }}
+          onClose={() => setShowImpersonateModal(false)}
+        />
       )}
     </div>
   );
