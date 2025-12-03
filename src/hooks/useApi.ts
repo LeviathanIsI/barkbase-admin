@@ -6,11 +6,22 @@ import type {
   CreateIncidentUpdateInput,
   CreateMaintenanceInput,
   UpdateMaintenanceInput,
+  StartMaintenanceInput,
+  CompleteMaintenanceInput,
+  ExtendMaintenanceInput,
+  PostMaintenanceUpdateInput,
   CreateBroadcastInput,
   UpdateBroadcastInput,
+  SendBroadcastInput,
+  BroadcastAudienceConfig,
   CreateFeatureFlagInput,
   UpdateFeatureFlagInput,
+  ToggleFeatureFlagInput,
+  UpdateRolloutInput,
+  CreateOverrideInput,
+  KillFlagInput,
   OpsSettings,
+  UpdateWhiteLabelInput,
 } from '@/types';
 
 // Query keys
@@ -28,19 +39,35 @@ export const queryKeys = {
   healthDatabase: ['health', 'database'] as const,
   healthAlerts: ['health', 'alerts'] as const,
   auditLogs: (params?: Record<string, unknown>) => ['audit-logs', params] as const,
-  maintenance: ['maintenance'] as const,
+  maintenance: (params?: Record<string, unknown>) => ['maintenance', params] as const,
+  maintenanceStats: ['maintenance', 'stats'] as const,
   maintenanceItem: (id: string) => ['maintenance', id] as const,
-  broadcasts: ['broadcasts'] as const,
+  maintenanceUpdates: (id: string) => ['maintenance', id, 'updates'] as const,
+  maintenanceNotifications: (id: string) => ['maintenance', id, 'notifications'] as const,
+  maintenanceAffected: (id: string) => ['maintenance', id, 'affected'] as const,
+  broadcasts: (params?: Record<string, unknown>) => ['broadcasts', params] as const,
+  broadcastStats: ['broadcasts', 'stats'] as const,
   broadcast: (id: string) => ['broadcast', id] as const,
+  broadcastAnalytics: (id: string) => ['broadcast', id, 'analytics'] as const,
+  broadcastRecipients: (id: string, params?: Record<string, unknown>) => ['broadcast', id, 'recipients', params] as const,
   activeBroadcasts: ['broadcasts', 'active'] as const,
-  featureFlags: ['feature-flags'] as const,
+  audienceEstimate: (type: string, config: BroadcastAudienceConfig) => ['audience-estimate', type, config] as const,
+  featureFlags: (params?: Record<string, unknown>) => ['feature-flags', params] as const,
+  featureFlagStats: ['feature-flags', 'stats'] as const,
   featureFlag: (id: string) => ['feature-flag', id] as const,
+  featureFlagTenants: (id: string, params?: Record<string, unknown>) => ['feature-flag', id, 'tenants', params] as const,
+  featureFlagHistory: (id: string) => ['feature-flag', id, 'history'] as const,
   analytics: (period: string) => ['analytics', period] as const,
   settings: ['settings'] as const,
   apiKeys: ['api-keys'] as const,
   dbTables: ['db-tables'] as const,
   dbSchema: (table: string) => ['db-schema', table] as const,
   savedQueries: ['saved-queries'] as const,
+  // White-label keys
+  whiteLabelStats: ['white-label', 'stats'] as const,
+  whiteLabelTenants: ['white-label', 'tenants'] as const,
+  whiteLabelBranding: (tenantId: string) => ['white-label', 'branding', tenantId] as const,
+  whiteLabelHistory: (tenantId: string) => ['white-label', 'history', tenantId] as const,
 };
 
 // Support hooks
@@ -191,6 +218,7 @@ export function useHealthAlerts() {
 // Audit log hooks
 export function useAuditLogs(params?: {
   page?: number;
+  limit?: number;
   action?: string;
   admin?: string;
   targetType?: string;
@@ -221,10 +249,17 @@ export function useStatusBanner() {
 }
 
 // Maintenance hooks
-export function useMaintenanceList() {
+export function useMaintenanceList(params?: { status?: string; type?: string; service?: string }) {
   return useQuery({
-    queryKey: queryKeys.maintenance,
-    queryFn: () => api.getMaintenanceList(),
+    queryKey: queryKeys.maintenance(params),
+    queryFn: () => api.getMaintenanceList(params),
+  });
+}
+
+export function useMaintenanceStats() {
+  return useQuery({
+    queryKey: queryKeys.maintenanceStats,
+    queryFn: () => api.getMaintenanceStats(),
   });
 }
 
@@ -236,12 +271,37 @@ export function useMaintenance(id: string) {
   });
 }
 
+export function useMaintenanceUpdates(id: string) {
+  return useQuery({
+    queryKey: queryKeys.maintenanceUpdates(id),
+    queryFn: () => api.getMaintenanceUpdates(id),
+    enabled: !!id,
+  });
+}
+
+export function useMaintenanceNotifications(id: string) {
+  return useQuery({
+    queryKey: queryKeys.maintenanceNotifications(id),
+    queryFn: () => api.getMaintenanceNotifications(id),
+    enabled: !!id,
+  });
+}
+
+export function useMaintenanceAffectedCustomers(id: string) {
+  return useQuery({
+    queryKey: queryKeys.maintenanceAffected(id),
+    queryFn: () => api.getMaintenanceAffectedCustomers(id),
+    enabled: !!id,
+  });
+}
+
 export function useCreateMaintenance() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: CreateMaintenanceInput) => api.createMaintenance(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.maintenance });
+      queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceStats });
       queryClient.invalidateQueries({ queryKey: queryKeys.status });
     },
   });
@@ -252,8 +312,9 @@ export function useUpdateMaintenance(id: string) {
   return useMutation({
     mutationFn: (data: UpdateMaintenanceInput) => api.updateMaintenance(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.maintenance });
+      queryClient.invalidateQueries({ queryKey: ['maintenance'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceItem(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceStats });
       queryClient.invalidateQueries({ queryKey: queryKeys.status });
     },
   });
@@ -264,17 +325,145 @@ export function useDeleteMaintenance() {
   return useMutation({
     mutationFn: (id: string) => api.deleteMaintenance(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.maintenance });
+      queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceStats });
       queryClient.invalidateQueries({ queryKey: queryKeys.status });
     },
   });
 }
 
-// Broadcast hooks
-export function useBroadcasts() {
+export function useStartMaintenance(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data?: StartMaintenanceInput) => api.startMaintenance(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceItem(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceUpdates(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceStats });
+      queryClient.invalidateQueries({ queryKey: queryKeys.status });
+    },
+  });
+}
+
+export function useCompleteMaintenance(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CompleteMaintenanceInput) => api.completeMaintenance(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceItem(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceUpdates(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceStats });
+      queryClient.invalidateQueries({ queryKey: queryKeys.status });
+    },
+  });
+}
+
+export function useExtendMaintenance(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: ExtendMaintenanceInput) => api.extendMaintenance(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceItem(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceUpdates(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceStats });
+    },
+  });
+}
+
+export function useCancelMaintenance(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.cancelMaintenance(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceItem(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceUpdates(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceStats });
+      queryClient.invalidateQueries({ queryKey: queryKeys.status });
+    },
+  });
+}
+
+export function usePostMaintenanceUpdate(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: PostMaintenanceUpdateInput) => api.postMaintenanceUpdate(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceUpdates(id) });
+    },
+  });
+}
+
+export function useSendMaintenanceNotification(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (notificationType: string) => api.sendMaintenanceNotification(id, notificationType),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceNotifications(id) });
+    },
+  });
+}
+
+export function useAddMaintenanceAffectedCustomer(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tenantId, tenantName }: { tenantId: string; tenantName?: string }) =>
+      api.addMaintenanceAffectedCustomer(id, tenantId, tenantName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceAffected(id) });
+    },
+  });
+}
+
+export function useRemoveMaintenanceAffectedCustomer(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (customerId: string) => api.removeMaintenanceAffectedCustomer(id, customerId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceAffected(id) });
+    },
+  });
+}
+
+export function useSkipMaintenanceOccurrence(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.skipMaintenanceOccurrence(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceItem(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceStats });
+    },
+  });
+}
+
+export function useDisableRecurringMaintenance(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.disableRecurringMaintenance(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceItem(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenanceStats });
+    },
+  });
+}
+
+// Broadcast hooks - Enhanced Enterprise
+export function useBroadcasts(params?: { status?: string; type?: string; audience?: string }) {
   return useQuery({
-    queryKey: queryKeys.broadcasts,
-    queryFn: () => api.getBroadcasts(),
+    queryKey: queryKeys.broadcasts(params),
+    queryFn: () => api.getBroadcasts(params),
+  });
+}
+
+export function useBroadcastStats() {
+  return useQuery({
+    queryKey: queryKeys.broadcastStats,
+    queryFn: () => api.getBroadcastStats(),
   });
 }
 
@@ -286,12 +475,41 @@ export function useBroadcast(id: string) {
   });
 }
 
+export function useBroadcastAnalytics(id: string) {
+  return useQuery({
+    queryKey: queryKeys.broadcastAnalytics(id),
+    queryFn: () => api.getBroadcastAnalytics(id),
+    enabled: !!id,
+  });
+}
+
+export function useBroadcastRecipients(id: string, params?: {
+  limit?: number;
+  offset?: number;
+  filter?: 'opened' | 'clicked' | 'dismissed' | 'unopened';
+}) {
+  return useQuery({
+    queryKey: queryKeys.broadcastRecipients(id, params),
+    queryFn: () => api.getBroadcastRecipients(id, params),
+    enabled: !!id,
+  });
+}
+
+export function useAudienceEstimate(audienceType: string, config: BroadcastAudienceConfig) {
+  return useQuery({
+    queryKey: queryKeys.audienceEstimate(audienceType, config),
+    queryFn: () => api.estimateBroadcastAudience(audienceType, config),
+    enabled: !!audienceType,
+  });
+}
+
 export function useCreateBroadcast() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: CreateBroadcastInput) => api.createBroadcast(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.broadcasts });
+      queryClient.invalidateQueries({ queryKey: ['broadcasts'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.broadcastStats });
     },
   });
 }
@@ -301,8 +519,9 @@ export function useUpdateBroadcast(id: string) {
   return useMutation({
     mutationFn: (data: UpdateBroadcastInput) => api.updateBroadcast(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.broadcasts });
+      queryClient.invalidateQueries({ queryKey: ['broadcasts'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.broadcast(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.broadcastStats });
     },
   });
 }
@@ -312,8 +531,63 @@ export function useDeleteBroadcast() {
   return useMutation({
     mutationFn: (id: string) => api.deleteBroadcast(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.broadcasts });
+      queryClient.invalidateQueries({ queryKey: ['broadcasts'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.broadcastStats });
     },
+  });
+}
+
+export function useSendBroadcast(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data?: SendBroadcastInput) => api.sendBroadcast(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['broadcasts'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.broadcast(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.broadcastStats });
+    },
+  });
+}
+
+export function useScheduleBroadcast(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (scheduledAt: string) => api.scheduleBroadcast(id, scheduledAt),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['broadcasts'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.broadcast(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.broadcastStats });
+    },
+  });
+}
+
+export function useCancelBroadcast(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.cancelBroadcast(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['broadcasts'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.broadcast(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.broadcastStats });
+    },
+  });
+}
+
+export function useEndBroadcast(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.endBroadcast(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['broadcasts'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.broadcast(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.broadcastStats });
+    },
+  });
+}
+
+export function usePreviewBroadcastEmail(id: string) {
+  return useMutation({
+    mutationFn: () => api.previewBroadcastEmail(id),
   });
 }
 
@@ -325,11 +599,23 @@ export function useActiveBroadcasts() {
   });
 }
 
-// Feature flag hooks
-export function useFeatureFlags() {
+// Feature flag hooks - Enterprise
+export function useFeatureFlags(params?: {
+  status?: 'enabled' | 'disabled' | 'rollout' | 'archived';
+  category?: string;
+  environment?: string;
+  search?: string;
+}) {
   return useQuery({
-    queryKey: queryKeys.featureFlags,
-    queryFn: () => api.getFeatureFlags(),
+    queryKey: queryKeys.featureFlags(params),
+    queryFn: () => api.getFeatureFlags(params),
+  });
+}
+
+export function useFeatureFlagStats() {
+  return useQuery({
+    queryKey: queryKeys.featureFlagStats,
+    queryFn: () => api.getFeatureFlagStats(),
   });
 }
 
@@ -341,12 +627,32 @@ export function useFeatureFlag(id: string) {
   });
 }
 
+export function useFeatureFlagTenants(id: string, params?: {
+  filter?: 'all' | 'enabled' | 'disabled';
+  search?: string;
+}) {
+  return useQuery({
+    queryKey: queryKeys.featureFlagTenants(id, params),
+    queryFn: () => api.getFeatureFlagTenants(id, params),
+    enabled: !!id,
+  });
+}
+
+export function useFeatureFlagHistory(id: string) {
+  return useQuery({
+    queryKey: queryKeys.featureFlagHistory(id),
+    queryFn: () => api.getFeatureFlagHistory(id),
+    enabled: !!id,
+  });
+}
+
 export function useCreateFeatureFlag() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: CreateFeatureFlagInput) => api.createFeatureFlag(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlags });
+      queryClient.invalidateQueries({ queryKey: ['feature-flags'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlagStats });
     },
   });
 }
@@ -356,8 +662,9 @@ export function useUpdateFeatureFlag(id: string) {
   return useMutation({
     mutationFn: (data: UpdateFeatureFlagInput) => api.updateFeatureFlag(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlags });
+      queryClient.invalidateQueries({ queryKey: ['feature-flags'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.featureFlag(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlagStats });
     },
   });
 }
@@ -367,7 +674,59 @@ export function useDeleteFeatureFlag() {
   return useMutation({
     mutationFn: (id: string) => api.deleteFeatureFlag(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlags });
+      queryClient.invalidateQueries({ queryKey: ['feature-flags'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlagStats });
+    },
+  });
+}
+
+export function useToggleFeatureFlag(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: ToggleFeatureFlagInput) => api.toggleFeatureFlag(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feature-flags'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlag(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlagStats });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlagHistory(id) });
+    },
+  });
+}
+
+export function useUpdateFeatureFlagRollout(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: UpdateRolloutInput) => api.updateFeatureFlagRollout(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feature-flags'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlag(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlagStats });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlagHistory(id) });
+    },
+  });
+}
+
+export function useKillFeatureFlag(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data?: KillFlagInput) => api.killFeatureFlag(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feature-flags'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlag(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlagStats });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlagHistory(id) });
+    },
+  });
+}
+
+export function useArchiveFeatureFlag(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.archiveFeatureFlag(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feature-flags'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlag(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlagStats });
     },
   });
 }
@@ -375,11 +734,13 @@ export function useDeleteFeatureFlag() {
 export function useAddFeatureFlagOverride(flagId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ tenantId, isEnabled }: { tenantId: string; isEnabled: boolean }) =>
-      api.addFeatureFlagOverride(flagId, tenantId, isEnabled),
+    mutationFn: ({ tenantId, data }: { tenantId: string; data: CreateOverrideInput }) =>
+      api.addFeatureFlagOverride(flagId, tenantId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.featureFlag(flagId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlags });
+      queryClient.invalidateQueries({ queryKey: ['feature-flags'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlagTenants(flagId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlagHistory(flagId) });
     },
   });
 }
@@ -387,10 +748,12 @@ export function useAddFeatureFlagOverride(flagId: string) {
 export function useRemoveFeatureFlagOverride(flagId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (overrideId: string) => api.removeFeatureFlagOverride(flagId, overrideId),
+    mutationFn: (tenantId: string) => api.removeFeatureFlagOverride(flagId, tenantId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.featureFlag(flagId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlags });
+      queryClient.invalidateQueries({ queryKey: ['feature-flags'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlagTenants(flagId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.featureFlagHistory(flagId) });
     },
   });
 }
@@ -515,6 +878,69 @@ export function useDeleteSavedQuery() {
     mutationFn: (id: string) => api.deleteSavedQuery(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.savedQueries });
+    },
+  });
+}
+
+// =========================================================================
+// White-label hooks
+// =========================================================================
+
+export function useWhiteLabelStats() {
+  return useQuery({
+    queryKey: queryKeys.whiteLabelStats,
+    queryFn: () => api.getWhiteLabelStats(),
+    staleTime: 60000,
+  });
+}
+
+export function useWhiteLabelTenants() {
+  return useQuery({
+    queryKey: queryKeys.whiteLabelTenants,
+    queryFn: () => api.getWhiteLabelTenants(),
+    staleTime: 30000,
+  });
+}
+
+export function useWhiteLabelBranding(tenantId: string) {
+  return useQuery({
+    queryKey: queryKeys.whiteLabelBranding(tenantId),
+    queryFn: () => api.getWhiteLabelBranding(tenantId),
+    enabled: !!tenantId,
+  });
+}
+
+export function useUpdateWhiteLabelBranding(tenantId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: UpdateWhiteLabelInput) => api.updateWhiteLabelBranding(tenantId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.whiteLabelBranding(tenantId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.whiteLabelTenants });
+      queryClient.invalidateQueries({ queryKey: queryKeys.whiteLabelStats });
+      queryClient.invalidateQueries({ queryKey: queryKeys.whiteLabelHistory(tenantId) });
+    },
+  });
+}
+
+export function useWhiteLabelHistory(tenantId: string) {
+  return useQuery({
+    queryKey: queryKeys.whiteLabelHistory(tenantId),
+    queryFn: () => api.getWhiteLabelHistory(tenantId),
+    enabled: !!tenantId,
+    staleTime: 30000,
+  });
+}
+
+export function useVerifyWhiteLabelDomain(tenantId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.verifyWhiteLabelDomain(tenantId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.whiteLabelBranding(tenantId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.whiteLabelTenants });
+      queryClient.invalidateQueries({ queryKey: queryKeys.whiteLabelStats });
+      queryClient.invalidateQueries({ queryKey: queryKeys.whiteLabelHistory(tenantId) });
     },
   });
 }

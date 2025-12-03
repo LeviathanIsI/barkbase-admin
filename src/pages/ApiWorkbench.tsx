@@ -37,42 +37,97 @@ interface ApiResponse {
   duration: number;
 }
 
-const ENDPOINT_LIBRARY = {
-  'Tenants': [
-    { method: 'GET', path: '/tenants', description: 'List all tenants' },
-    { method: 'GET', path: '/tenants/:id', description: 'Get tenant by ID' },
-    { method: 'GET', path: '/tenants/:id/users', description: 'Get tenant users' },
-    { method: 'GET', path: '/tenants/:id/settings', description: 'Get tenant settings' },
+const ENDPOINT_LIBRARY: Record<string, Array<{ method: string; path: string; description: string }>> = {
+  // ================================
+  // READ-ONLY OPS ENDPOINTS
+  // Support agents investigate, they don't modify
+  // ================================
+  
+  '🏥 Health & System': [
+    { method: 'GET', path: '/api/v1/health', description: 'System health check' },
   ],
-  'Users': [
-    { method: 'GET', path: '/users', description: 'List users' },
-    { method: 'GET', path: '/users/:id', description: 'Get user by ID' },
-    { method: 'GET', path: '/users/me', description: 'Get current user' },
+  
+  '👥 Users (Lookup)': [
+    { method: 'GET', path: '/api/v1/users/{userId}', description: 'Get user by ID' },
+    { method: 'GET', path: '/api/v1/profile/{userId}', description: 'Get user profile by ID' },
   ],
-  'Bookings': [
-    { method: 'GET', path: '/bookings', description: 'List bookings' },
-    { method: 'GET', path: '/bookings/:id', description: 'Get booking by ID' },
-    { method: 'POST', path: '/bookings', description: 'Create booking' },
-    { method: 'PUT', path: '/bookings/:id', description: 'Update booking' },
-    { method: 'DELETE', path: '/bookings/:id', description: 'Cancel booking' },
+  
+  '🏢 Tenants & Customers': [
+    { method: 'GET', path: '/api/v1/customer/list', description: 'List all customers' },
+    { method: 'GET', path: '/api/v1/customer/{customerId}', description: 'Get customer by ID' },
+    { method: 'GET', path: '/api/v1/entity/list', description: 'List entities' },
+    { method: 'GET', path: '/api/v1/entity/{entityId}', description: 'Get entity by ID' },
   ],
-  'Pets': [
-    { method: 'GET', path: '/pets', description: 'List pets' },
-    { method: 'GET', path: '/pets/:id', description: 'Get pet by ID' },
-    { method: 'POST', path: '/pets', description: 'Create pet' },
-    { method: 'PUT', path: '/pets/:id', description: 'Update pet' },
+  
+  '👨‍💼 Staff': [
+    { method: 'GET', path: '/api/v1/staff', description: 'List all staff' },
+    { method: 'GET', path: '/api/v1/staff/{staffId}', description: 'Get staff member' },
   ],
-  'Services': [
-    { method: 'GET', path: '/services', description: 'List services' },
-    { method: 'GET', path: '/services/:id', description: 'Get service by ID' },
-    { method: 'POST', path: '/services', description: 'Create service' },
+  
+  '📅 Calendar & Bookings': [
+    { method: 'GET', path: '/api/v1/calendar/bookings', description: 'List bookings' },
+    { method: 'GET', path: '/api/v1/calendar/bookings/{bookingId}', description: 'Get booking details' },
+    { method: 'GET', path: '/api/v1/calendar/availability', description: 'Check availability' },
+    { method: 'GET', path: '/api/v1/recurring', description: 'List recurring bookings' },
+    { method: 'GET', path: '/api/v1/recurring/{recurringId}', description: 'Get recurring booking' },
   ],
-  'Payments': [
-    { method: 'GET', path: '/payments', description: 'List payments' },
-    { method: 'GET', path: '/payments/:id', description: 'Get payment by ID' },
-    { method: 'GET', path: '/invoices', description: 'List invoices' },
+  
+  '🚐 Runs & Services': [
+    { method: 'GET', path: '/api/v1/runs/list', description: 'List runs' },
+    { method: 'GET', path: '/api/v1/runs/{runId}', description: 'Get run details' },
+    { method: 'GET', path: '/api/v1/run-templates', description: 'List run templates' },
+    { method: 'GET', path: '/api/v1/addon-services', description: 'List addon services' },
+    { method: 'GET', path: '/api/v1/package-templates', description: 'List packages' },
+    { method: 'GET', path: '/api/v1/memberships', description: 'List memberships' },
   ],
-};
+  
+  '⏰ Scheduling': [
+    { method: 'GET', path: '/api/v1/shifts', description: 'List shifts' },
+    { method: 'GET', path: '/api/v1/shifts/{shiftId}', description: 'Get shift details' },
+    { method: 'GET', path: '/api/v1/time-entries', description: 'List time entries' },
+    { method: 'GET', path: '/api/v1/time-entries/{entryId}', description: 'Get time entry' },
+  ],
+  
+  '🚨 Operations & Incidents': [
+    { method: 'GET', path: '/api/v1/operations/status', description: 'Operations status' },
+    { method: 'GET', path: '/api/v1/incidents', description: 'List incidents' },
+    { method: 'GET', path: '/api/v1/incidents/{incidentId}', description: 'Get incident details' },
+  ],
+  
+  '💰 Financial (Read-Only)': [
+    { method: 'GET', path: '/api/v1/financial/invoices', description: 'List invoices' },
+    { method: 'GET', path: '/api/v1/financial/invoices/{invoiceId}', description: 'Get invoice' },
+    { method: 'GET', path: '/api/v1/financial/payments', description: 'List payments' },
+    { method: 'GET', path: '/api/v1/financial/transactions', description: 'List transactions' },
+  ],
+  
+  '⚙️ Settings & Config': [
+    { method: 'GET', path: '/api/v1/settings/general', description: 'Get general settings' },
+    { method: 'GET', path: '/api/v1/config/features', description: 'Get feature flags' },
+    { method: 'GET', path: '/api/v1/policies', description: 'List policies' },
+    { method: 'GET', path: '/api/v1/account-defaults', description: 'Get account defaults' },
+  ],
+  
+  '📄 Documents & Forms': [
+    { method: 'GET', path: '/api/v1/documents', description: 'List documents' },
+    { method: 'GET', path: '/api/v1/documents/{documentId}', description: 'Get document' },
+    { method: 'GET', path: '/api/v1/forms', description: 'List forms' },
+    { method: 'GET', path: '/api/v1/compliance/status', description: 'Compliance status' },
+  ],
+  
+  '📨 Communications': [
+    { method: 'GET', path: '/api/v1/messages/list', description: 'List messages' },
+    { method: 'GET', path: '/api/v1/messages/{messageId}', description: 'Get message' },
+    { method: 'GET', path: '/api/v1/notifications/list', description: 'List notifications' },
+  ],
+  
+  '📊 Analytics & Audit': [
+    { method: 'GET', path: '/api/v1/analytics/overview', description: 'Analytics overview' },
+    { method: 'GET', path: '/api/v1/reports/list', description: 'List reports' },
+    { method: 'GET', path: '/api/v1/audit-logs', description: 'Audit log entries' },
+    { method: 'GET', path: '/api/v1/segments', description: 'List segments' },
+  ],
+}
 
 const METHOD_COLORS: Record<HttpMethod, string> = {
   GET: 'bg-[var(--color-success)] text-white',
@@ -114,7 +169,7 @@ function JsonSyntaxHighlight({ json }: { json: string }) {
 
 export function ApiWorkbench() {
   const [method, setMethod] = useState<HttpMethod>('GET');
-  const [path, setPath] = useState('/tenants');
+  const [path, setPath] = useState('/api/v1/health');
   const [body, setBody] = useState('');
   const [bodyError, setBodyError] = useState<string | null>(null);
   const [tenantSearch, setTenantSearch] = useState('');
@@ -125,8 +180,9 @@ export function ApiWorkbench() {
   const [history, setHistory] = useState<RequestHistoryItem[]>([]);
   const [showLibrary, setShowLibrary] = useState(true);
   const [showHistory, setShowHistory] = useState(true);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ Tenants: true });
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ Health: true });
   const [showHeaders, setShowHeaders] = useState(false);
+  const [pathParams, setPathParams] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState(false);
 
   const { data: searchData } = useSearch(tenantSearch);
@@ -174,7 +230,7 @@ export function ApiWorkbench() {
     try {
       const result = await apiProxy.mutateAsync({
         method,
-        path,
+        path: getResolvedPath(),
         body: body && (method === 'POST' || method === 'PUT' || method === 'PATCH') ? JSON.parse(body) : undefined,
         tenantId: selectedTenant.id,
       });
@@ -193,7 +249,7 @@ export function ApiWorkbench() {
       const historyItem: RequestHistoryItem = {
         id: crypto.randomUUID(),
         method,
-        path,
+        path: getResolvedPath(),
         tenantId: selectedTenant.id,
         tenantName: selectedTenant.name,
         timestamp: new Date().toISOString(),
@@ -240,6 +296,21 @@ export function ApiWorkbench() {
 
   const toggleGroup = (group: string) => {
     setExpandedGroups(prev => ({ ...prev, [group]: !prev[group] }));
+  };
+
+  // Get path with parameters substituted
+  const getResolvedPath = () => {
+    let resolvedPath = path;
+    Object.entries(pathParams).forEach(([key, value]) => {
+      if (value) {
+        resolvedPath = resolvedPath.replace(`{${key}}`, value);
+      }
+    });
+    return resolvedPath;
+  };
+
+  const hasUnfilledParams = () => {
+    return Object.values(pathParams).some(v => !v) && Object.keys(pathParams).length > 0;
   };
 
   const selectEndpoint = (endpoint: { method: string; path: string }) => {
@@ -387,13 +458,33 @@ export function ApiWorkbench() {
             />
             <button
               onClick={handleExecute}
-              disabled={isLoading || !selectedTenant}
+              disabled={isLoading || !selectedTenant || hasUnfilledParams()}
               className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-[var(--color-brand)] text-white hover:bg-[var(--color-brand-hover)] disabled:opacity-50"
             >
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play size={16} />}
               Send
             </button>
           </div>
+
+          {/* Path Parameters */}
+          {Object.keys(pathParams).length > 0 && (
+            <div className="grid grid-cols-2 gap-3">
+              {Object.entries(pathParams).map(([paramName, paramValue]) => (
+                <div key={paramName}>
+                  <label className="block text-xs font-medium text-[var(--text-muted)] mb-1">
+                    {paramName}
+                  </label>
+                  <input
+                    type="text"
+                    value={paramValue}
+                    onChange={(e) => setPathParams(prev => ({ ...prev, [paramName]: e.target.value }))}
+                    placeholder={`Enter ${paramName}...`}
+                    className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm font-mono text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Body Editor */}
           {(method === 'POST' || method === 'PUT' || method === 'PATCH') && (

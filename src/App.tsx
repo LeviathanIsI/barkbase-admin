@@ -5,7 +5,8 @@ import { ImpersonationProvider } from '@/contexts/ImpersonationContext';
 import { Layout } from '@/components/layout/Layout';
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
 import { Login } from '@/pages/Login';
-import { Support } from '@/pages/Support';
+import { SupportDesk } from '@/pages/SupportDesk';
+import { Customers } from '@/pages/Customers';
 import { Incidents } from '@/pages/Incidents';
 import { IncidentDetailPage } from '@/pages/IncidentDetailPage';
 import { CommandCenter } from '@/pages/CommandCenter';
@@ -53,7 +54,8 @@ function App() {
                 }
               >
                 <Route path="/" element={<Navigate to="/support" replace />} />
-                <Route path="/support" element={<Support />} />
+                <Route path="/support" element={<SupportDesk />} />
+                <Route path="/customers" element={<Customers />} />
                 <Route path="/incidents" element={<Incidents />} />
                 <Route path="/incidents/:id" element={<IncidentDetailPage />} />
                 <Route path="/command-center" element={<CommandCenter />} />

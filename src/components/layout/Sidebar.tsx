@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom';
-import { Headphones, AlertTriangle, Activity, Gauge, FileText, LogOut, ExternalLink, Calendar, Megaphone, Flag, BarChart3, Cog, Database, Terminal, Palette, Heart, Plug, Mail, Shield } from 'lucide-react';
+import { Headphones, Ticket, AlertTriangle, Activity, Gauge, FileText, LogOut, ExternalLink, Calendar, Megaphone, Flag, BarChart3, Cog, Database, Terminal, Palette, Heart, Plug, Mail, Shield } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 const navItems = [
-  { to: '/support', label: 'Support Desk', icon: Headphones },
+  { to: '/support', label: 'Support Desk', icon: Ticket },
+  { to: '/customers', label: 'Customers', icon: Headphones },
   { to: '/incidents', label: 'Incidents', icon: AlertTriangle },
   { to: '/command-center', label: 'Command Center', icon: Gauge },
   { to: '/audit-logs', label: 'Audit Logs', icon: FileText },

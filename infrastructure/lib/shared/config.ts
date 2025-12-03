@@ -5,9 +5,9 @@
  * Uses the EXISTING BarkBase VPC and Cognito resources.
  */
 
-import * as cdk from 'aws-cdk-lib';
+import * as cdk from "aws-cdk-lib";
 
-export type Environment = 'dev' | 'prod';
+export type Environment = "dev" | "prod";
 
 export interface OpsConfig {
   readonly env: Environment;
@@ -20,15 +20,18 @@ export interface OpsConfig {
   readonly corsOrigins: string[];
   // Existing BarkBase resources to reference
   readonly barkbaseStackPrefix: string;
+  // BarkBase API URL for API Workbench proxy
+  readonly barkbaseApiUrl?: string;
 }
 
 /**
  * Get configuration for the specified environment
  */
 export function getConfig(app: cdk.App): OpsConfig {
-  const env = (app.node.tryGetContext('env') as Environment) || 'dev';
-  const account = process.env.CDK_DEFAULT_ACCOUNT || process.env.AWS_ACCOUNT_ID || '';
-  const region = 'us-east-2';
+  const env = (app.node.tryGetContext("env") as Environment) || "dev";
+  const account =
+    process.env.CDK_DEFAULT_ACCOUNT || process.env.AWS_ACCOUNT_ID || "";
+  const region = "us-east-2";
 
   const barkbaseStackPrefix = `barkbase-${env}`;
 
@@ -41,24 +44,25 @@ export function getConfig(app: cdk.App): OpsConfig {
     barkbaseStackPrefix,
   };
 
-  if (env === 'prod') {
+  if (env === "prod") {
     return {
       ...baseConfig,
-      dbInstanceClass: 't3.micro', // Ops DB is small, doesn't need big instance
+      dbInstanceClass: "t3.micro", // Ops DB is small, doesn't need big instance
       dbMultiAz: true,
-      corsOrigins: [
-        'https://ops.barkbase.io',
-        'https://admin.barkbase.io',
-      ],
+      corsOrigins: ["https://ops.barkbase.io", "https://admin.barkbase.io"],
+      barkbaseApiUrl: "https://api.barkbase.io",
     };
   }
 
   // Dev environment
-  const cloudfrontUrl = app.node.tryGetContext('cloudfrontUrl') as string | undefined;
+  const cloudfrontUrl = app.node.tryGetContext("cloudfrontUrl") as
+    | string
+    | undefined;
   const devCorsOrigins = [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'http://127.0.0.1:3000',
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
   ];
 
   if (cloudfrontUrl) {
@@ -67,9 +71,10 @@ export function getConfig(app: cdk.App): OpsConfig {
 
   return {
     ...baseConfig,
-    dbInstanceClass: 't3.micro',
+    dbInstanceClass: "t3.micro",
     dbMultiAz: false,
     corsOrigins: devCorsOrigins,
+    barkbaseApiUrl: "https://mxvb0b8l56.execute-api.us-east-2.amazonaws.com",
   };
 }
 
