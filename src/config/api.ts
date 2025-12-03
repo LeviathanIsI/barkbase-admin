@@ -53,4 +53,27 @@ export const API_ENDPOINTS = {
   statusBroadcasts: '/status/broadcasts',
   statusMaintenance: '/status/maintenance',
   publicFeatures: '/api/features',
+
+  // Analytics endpoints
+  analytics: '/admin/analytics',
+
+  // Settings endpoints
+  settings: '/admin/settings',
+
+  // API Keys endpoints
+  apiKeys: '/admin/api-keys',
+  apiKey: (id: string) => `/admin/api-keys/${id}`,
+
+  // API Proxy endpoint
+  apiProxy: '/admin/api-proxy',
+
+  // Database explorer endpoints
+  dbTables: '/admin/db/tables',
+  dbSchema: (table: string) => `/admin/db/tables/${table}/schema`,
+  dbQuery: '/admin/db/query',
+  savedQueries: '/admin/db/queries',
+  savedQuery: (id: string) => `/admin/db/queries/${id}`,
+
+  // Tenants list (for selectors)
+  tenants: '/admin/tenants',
 } as const;

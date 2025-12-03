@@ -5,6 +5,7 @@ import { useSuspendTenant, useUnsuspendTenant, useExtendTrial, useResetUserPassw
 import { useAuth } from '@/hooks/useAuth';
 import { useImpersonation } from '@/contexts/ImpersonationContext';
 import { ImpersonateModal } from './ImpersonateModal';
+import { SlideOutPanel } from '@/components/ui/SlideOutPanel';
 import type { TenantDetail as TenantDetailType, TenantUser } from '@/types';
 
 interface TenantDetailProps {
@@ -283,57 +284,57 @@ export function TenantDetail({ tenant, onClose, onRefresh }: TenantDetailProps) 
         )}
       </div>
 
-      {/* Extend Trial Modal */}
-      {showExtendTrialModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[var(--z-modal)]">
-          <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg w-full max-w-sm p-5">
-            <h3 className="text-base font-semibold text-[var(--text-primary)] mb-1">
-              Extend Trial Period
-            </h3>
-            <p className="text-sm text-[var(--text-muted)] mb-4">
-              How many days to extend for <strong>{tenant.name}</strong>?
-            </p>
-            <div className="mb-4">
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                Days to extend
-              </label>
-              <select
-                value={trialDays}
-                onChange={(e) => setTrialDays(Number(e.target.value))}
-                className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
-              >
-                <option value={7}>7 days</option>
-                <option value={14}>14 days</option>
-                <option value={30}>30 days</option>
-              </select>
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowExtendTrialModal(false)}
-                className="px-3 py-1.5 rounded-md text-sm text-[var(--text-secondary)] hover:bg-[var(--hover-overlay)] transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleExtendTrial}
-                disabled={extendTrial.isPending}
-                className="px-3 py-1.5 rounded-md bg-[var(--color-brand)] text-white text-sm font-medium hover:bg-[var(--color-brand-hover)] transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                {extendTrial.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                Extend
-              </button>
-            </div>
+      {/* Extend Trial Panel */}
+      <SlideOutPanel
+        isOpen={showExtendTrialModal}
+        onClose={() => setShowExtendTrialModal(false)}
+        title="Extend Trial Period"
+        subtitle={tenant.name}
+        width="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setShowExtendTrialModal(false)}
+              className="px-3 py-1.5 rounded-md text-sm text-[var(--text-secondary)] hover:bg-[var(--hover-overlay)] transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleExtendTrial}
+              disabled={extendTrial.isPending}
+              className="px-3 py-1.5 rounded-md bg-[var(--color-brand)] text-white text-sm font-medium hover:bg-[var(--color-brand-hover)] transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              {extendTrial.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              Extend
+            </button>
           </div>
+        }
+      >
+        <p className="text-sm text-[var(--text-muted)] mb-4">
+          How many days would you like to extend the trial period?
+        </p>
+        <div>
+          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+            Days to extend
+          </label>
+          <select
+            value={trialDays}
+            onChange={(e) => setTrialDays(Number(e.target.value))}
+            className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
+          >
+            <option value={7}>7 days</option>
+            <option value={14}>14 days</option>
+            <option value={30}>30 days</option>
+          </select>
         </div>
-      )}
+      </SlideOutPanel>
 
       {/* Impersonate Modal */}
-      {showImpersonateModal && (
-        <ImpersonateModal
-          tenant={{ id: tenant.id, name: tenant.name }}
-          onClose={() => setShowImpersonateModal(false)}
-        />
-      )}
+      <ImpersonateModal
+        tenant={{ id: tenant.id, name: tenant.name }}
+        isOpen={showImpersonateModal}
+        onClose={() => setShowImpersonateModal(false)}
+      />
     </div>
   );
 }

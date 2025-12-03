@@ -390,3 +390,34 @@ button:disabled {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+
+/* Slide-out panel animation */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-out-right {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+.animate-slide-out-right {
+  animation: slide-out-right 0.2s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}

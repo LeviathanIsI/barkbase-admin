@@ -368,6 +368,76 @@ export interface UpdateFeatureFlagInput {
   rolloutPercentage?: number;
 }
 
+// Analytics types
+export interface AnalyticsData {
+  mrr: number;
+  arr: number;
+  revenueThisMonth: number;
+  avgRevenuePerTenant: number;
+  totalTenants: number;
+  newSignups: number;
+  churnRate: number;
+  netGrowth: number;
+  signups: { date: string; count: number }[];
+  revenue: { date: string; revenue: number }[];
+  planDistribution: { name: string; value: number; color: string }[];
+  featureUsage: { name: string; usage: number }[];
+  topTenants: {
+    name: string;
+    plan: string;
+    bookings: number;
+    users: number;
+    mrr: number;
+  }[];
+}
+
+// Settings types
+export interface OpsSettings {
+  opsCenterName: string;
+  supportEmail: string;
+  defaultTimezone: string;
+  slackWebhookUrl: string;
+  alertEmailRecipients: string;
+  errorRateThreshold: number;
+  responseTimeThreshold: number;
+  sessionTimeout: number;
+  impersonationTimeLimit: number;
+  requireReasonForSensitiveActions: boolean;
+  ipWhitelist: string;
+  primaryColor: string;
+}
+
+// API Key types
+export interface ApiKey {
+  id: string;
+  name: string;
+  prefix: string;
+  createdAt: string;
+  lastUsedAt?: string;
+}
+
+// Database Explorer types
+export interface DbTableSchema {
+  column_name: string;
+  data_type: string;
+  is_nullable: string;
+  column_default: string | null;
+  constraint_type?: string;
+}
+
+export interface DbQueryResult {
+  rows: Record<string, unknown>[];
+  rowCount: number;
+  duration: number;
+}
+
+export interface SavedQuery {
+  id: string;
+  name: string;
+  query: string;
+  createdAt: string;
+}
+
 // API response types
 export interface PaginatedResponse<T> {
   data: T[];

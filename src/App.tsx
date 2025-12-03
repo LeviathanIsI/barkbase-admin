@@ -14,6 +14,15 @@ import { Maintenance } from '@/pages/Maintenance';
 import { Broadcasts } from '@/pages/Broadcasts';
 import { FeatureFlags } from '@/pages/FeatureFlags';
 import { StatusPage } from '@/pages/StatusPage';
+import { ApiWorkbench } from '@/pages/ApiWorkbench';
+import { Analytics } from '@/pages/Analytics';
+import { Settings } from '@/pages/Settings';
+import { DbExplorer } from '@/pages/DbExplorer';
+import { WhiteLabel } from '@/pages/WhiteLabel';
+import { CustomerHealth } from '@/pages/CustomerHealth';
+import { Integrations } from '@/pages/Integrations';
+import { EmailTemplates } from '@/pages/EmailTemplates';
+import { SLA } from '@/pages/SLA';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,6 +61,15 @@ function App() {
                 <Route path="/maintenance" element={<Maintenance />} />
                 <Route path="/broadcasts" element={<Broadcasts />} />
                 <Route path="/feature-flags" element={<FeatureFlags />} />
+                <Route path="/api-workbench" element={<ApiWorkbench />} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/db-explorer" element={<DbExplorer />} />
+                <Route path="/white-label" element={<WhiteLabel />} />
+                <Route path="/customer-health" element={<CustomerHealth />} />
+                <Route path="/integrations" element={<Integrations />} />
+                <Route path="/email-templates" element={<EmailTemplates />} />
+                <Route path="/sla" element={<SLA />} />
               </Route>
 
               {/* Fallback */}

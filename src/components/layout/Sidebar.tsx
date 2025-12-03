@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Headphones, AlertTriangle, Activity, Gauge, FileText, LogOut, ExternalLink, Calendar, Megaphone, Flag } from 'lucide-react';
+import { Headphones, AlertTriangle, Activity, Gauge, FileText, LogOut, ExternalLink, Calendar, Megaphone, Flag, BarChart3, Cog, Database, Terminal, Palette, Heart, Plug, Mail, Shield } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 const navItems = [
@@ -13,6 +13,21 @@ const configItems = [
   { to: '/maintenance', label: 'Maintenance', icon: Calendar },
   { to: '/broadcasts', label: 'Broadcasts', icon: Megaphone },
   { to: '/feature-flags', label: 'Feature Flags', icon: Flag },
+];
+
+const toolItems = [
+  { to: '/api-workbench', label: 'API Workbench', icon: Terminal },
+  { to: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { to: '/customer-health', label: 'Customer Health', icon: Heart },
+  { to: '/db-explorer', label: 'DB Explorer', icon: Database, superAdminOnly: true },
+  { to: '/settings', label: 'Settings', icon: Cog },
+];
+
+const enterpriseItems = [
+  { to: '/white-label', label: 'White-Label', icon: Palette },
+  { to: '/email-templates', label: 'Email Templates', icon: Mail },
+  { to: '/integrations', label: 'Integrations', icon: Plug },
+  { to: '/sla', label: 'SLA Dashboard', icon: Shield },
 ];
 
 export function Sidebar() {
@@ -95,6 +110,74 @@ export function Sidebar() {
         </div>
         <ul className="space-y-1">
           {configItems.map(({ to, label, icon: Icon }) => (
+            <li key={to}>
+              <NavLink
+                to={to}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all relative ${
+                    isActive
+                      ? 'bg-[var(--color-brand-subtle)] text-[var(--color-brand-light)]'
+                      : 'text-[var(--text-secondary)] hover:bg-[var(--hover-overlay)] hover:text-[var(--text-primary)]'
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    {isActive && (
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-[var(--color-brand)] rounded-r-full" />
+                    )}
+                    <Icon size={18} className="flex-shrink-0" />
+                    <span>{label}</span>
+                  </>
+                )}
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+
+        {/* Tools Section */}
+        <div className="mt-6 mb-2 px-3">
+          <span className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
+            Tools
+          </span>
+        </div>
+        <ul className="space-y-1">
+          {toolItems
+            .filter(item => !item.superAdminOnly || user?.role === 'super_admin')
+            .map(({ to, label, icon: Icon }) => (
+            <li key={to}>
+              <NavLink
+                to={to}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all relative ${
+                    isActive
+                      ? 'bg-[var(--color-brand-subtle)] text-[var(--color-brand-light)]'
+                      : 'text-[var(--text-secondary)] hover:bg-[var(--hover-overlay)] hover:text-[var(--text-primary)]'
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    {isActive && (
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-[var(--color-brand)] rounded-r-full" />
+                    )}
+                    <Icon size={18} className="flex-shrink-0" />
+                    <span>{label}</span>
+                  </>
+                )}
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+
+        {/* Enterprise Section */}
+        <div className="mt-6 mb-2 px-3">
+          <span className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
+            Enterprise
+          </span>
+        </div>
+        <ul className="space-y-1">
+          {enterpriseItems.map(({ to, label, icon: Icon }) => (
             <li key={to}>
               <NavLink
                 to={to}

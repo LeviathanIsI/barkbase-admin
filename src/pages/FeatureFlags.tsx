@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { Loader2, Flag, Plus, X, ChevronDown, ChevronRight, ToggleLeft, ToggleRight, Edit, Trash2, Users, Search } from 'lucide-react';
 import { useFeatureFlags, useFeatureFlag, useCreateFeatureFlag, useUpdateFeatureFlag, useDeleteFeatureFlag, useAddFeatureFlagOverride, useRemoveFeatureFlagOverride, useSearch } from '@/hooks/useApi';
+import { SlideOutPanel } from '@/components/ui/SlideOutPanel';
 import type { FeatureFlag, CreateFeatureFlagInput, UpdateFeatureFlagInput, FeatureFlagOverride } from '@/types';
 
-function FlagModal({
+function FlagPanel({
   flag,
+  isOpen,
   onClose,
   onSave,
   isSaving,
 }: {
   flag?: FeatureFlag;
+  isOpen: boolean;
   onClose: () => void;
   onSave: (data: CreateFeatureFlagInput | UpdateFeatureFlagInput) => void;
   isSaving: boolean;
@@ -43,109 +46,13 @@ function FlagModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[var(--z-modal)]">
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg w-full max-w-md">
-        <div className="flex items-center justify-between p-4 border-b border-[var(--border-primary)]">
-          <h3 className="text-base font-semibold text-[var(--text-primary)]">
-            {flag ? 'Edit Feature Flag' : 'Create Feature Flag'}
-          </h3>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-md hover:bg-[var(--hover-overlay)] text-[var(--text-muted)]"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          {!flag && (
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                Key <span className="text-[var(--color-error)]">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.key}
-                onChange={(e) => setFormData(prev => ({ ...prev, key: e.target.value }))}
-                required
-                pattern="[a-z0-9_]+"
-                placeholder="e.g., ai_scheduling"
-                className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--color-brand)]"
-              />
-              <p className="text-xs text-[var(--text-muted)] mt-1">
-                Lowercase letters, numbers, and underscores only
-              </p>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-              Name <span className="text-[var(--color-error)]">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => {
-                setFormData(prev => ({
-                  ...prev,
-                  name: e.target.value,
-                  key: flag ? prev.key : generateKey(e.target.value),
-                }));
-              }}
-              required
-              placeholder="e.g., AI Scheduling"
-              className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-              Description
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              rows={2}
-              placeholder="Describe what this feature does..."
-              className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)] resize-none"
-            />
-          </div>
-
-          <div className="flex items-center justify-between p-3 bg-[var(--bg-tertiary)] rounded-md">
-            <div>
-              <span className="text-sm font-medium text-[var(--text-primary)]">Enabled</span>
-              <p className="text-xs text-[var(--text-muted)]">Turn this feature on globally</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setFormData(prev => ({ ...prev, isEnabled: !prev.isEnabled }))}
-              className={`p-1 ${formData.isEnabled ? 'text-[var(--color-success)]' : 'text-[var(--text-muted)]'}`}
-            >
-              {formData.isEnabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
-            </button>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-              Rollout Percentage: {formData.rolloutPercentage}%
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={formData.rolloutPercentage}
-              onChange={(e) => setFormData(prev => ({ ...prev, rolloutPercentage: Number(e.target.value) }))}
-              className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-[var(--bg-tertiary)]"
-            />
-            <div className="flex justify-between text-xs text-[var(--text-muted)] mt-1">
-              <span>0%</span>
-              <span>50%</span>
-              <span>100%</span>
-            </div>
-          </div>
-        </form>
-
-        <div className="flex justify-end gap-2 p-4 border-t border-[var(--border-primary)]">
+    <SlideOutPanel
+      isOpen={isOpen}
+      onClose={onClose}
+      title={flag ? 'Edit Feature Flag' : 'Create Feature Flag'}
+      width="sm"
+      footer={
+        <div className="flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
@@ -162,16 +69,106 @@ function FlagModal({
             {flag ? 'Update' : 'Create'}
           </button>
         </div>
-      </div>
-    </div>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {!flag && (
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+              Key <span className="text-[var(--color-error)]">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.key}
+              onChange={(e) => setFormData(prev => ({ ...prev, key: e.target.value }))}
+              required
+              pattern="[a-z0-9_]+"
+              placeholder="e.g., ai_scheduling"
+              className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--color-brand)]"
+            />
+            <p className="text-xs text-[var(--text-muted)] mt-1">
+              Lowercase letters, numbers, and underscores only
+            </p>
+          </div>
+        )}
+
+        <div>
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+            Name <span className="text-[var(--color-error)]">*</span>
+          </label>
+          <input
+            type="text"
+            value={formData.name}
+            onChange={(e) => {
+              setFormData(prev => ({
+                ...prev,
+                name: e.target.value,
+                key: flag ? prev.key : generateKey(e.target.value),
+              }));
+            }}
+            required
+            placeholder="e.g., AI Scheduling"
+            className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+            Description
+          </label>
+          <textarea
+            value={formData.description}
+            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+            rows={2}
+            placeholder="Describe what this feature does..."
+            className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)] resize-none"
+          />
+        </div>
+
+        <div className="flex items-center justify-between p-3 bg-[var(--bg-tertiary)] rounded-md">
+          <div>
+            <span className="text-sm font-medium text-[var(--text-primary)]">Enabled</span>
+            <p className="text-xs text-[var(--text-muted)]">Turn this feature on globally</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFormData(prev => ({ ...prev, isEnabled: !prev.isEnabled }))}
+            className={`p-1 ${formData.isEnabled ? 'text-[var(--color-success)]' : 'text-[var(--text-muted)]'}`}
+          >
+            {formData.isEnabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+          </button>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+            Rollout Percentage: {formData.rolloutPercentage}%
+          </label>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={formData.rolloutPercentage}
+            onChange={(e) => setFormData(prev => ({ ...prev, rolloutPercentage: Number(e.target.value) }))}
+            className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-[var(--bg-tertiary)]"
+          />
+          <div className="flex justify-between text-xs text-[var(--text-muted)] mt-1">
+            <span>0%</span>
+            <span>50%</span>
+            <span>100%</span>
+          </div>
+        </div>
+      </form>
+    </SlideOutPanel>
   );
 }
 
-function OverrideModal({
+function OverridePanel({
   flagId,
+  isOpen,
   onClose,
 }: {
   flagId: string;
+  isOpen: boolean;
   onClose: () => void;
 }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -190,84 +187,13 @@ function OverrideModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[var(--z-modal)]">
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg w-full max-w-md">
-        <div className="flex items-center justify-between p-4 border-b border-[var(--border-primary)]">
-          <h3 className="text-base font-semibold text-[var(--text-primary)]">
-            Add Tenant Override
-          </h3>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-md hover:bg-[var(--hover-overlay)] text-[var(--text-muted)]"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="p-4 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-              Search Tenant
-            </label>
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setSelectedTenantId('');
-                }}
-                placeholder="Search by tenant name..."
-                className="w-full pl-9 pr-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
-              />
-            </div>
-            {searchQuery.length >= 2 && (
-              <div className="mt-2 max-h-40 overflow-y-auto border border-[var(--border-primary)] rounded-md">
-                {isSearching ? (
-                  <div className="p-3 text-center">
-                    <Loader2 className="w-4 h-4 animate-spin inline" />
-                  </div>
-                ) : tenantResults.length > 0 ? (
-                  tenantResults.map(tenant => (
-                    <button
-                      key={tenant.id}
-                      onClick={() => {
-                        setSelectedTenantId(tenant.id);
-                        setSearchQuery(tenant.name);
-                      }}
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-[var(--hover-overlay)] ${
-                        selectedTenantId === tenant.id ? 'bg-[var(--color-brand-subtle)]' : ''
-                      }`}
-                    >
-                      <span className="text-[var(--text-primary)]">{tenant.name}</span>
-                      <span className="text-xs text-[var(--text-muted)] ml-2">{tenant.subdomain}</span>
-                    </button>
-                  ))
-                ) : (
-                  <div className="p-3 text-center text-sm text-[var(--text-muted)]">
-                    No tenants found
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between p-3 bg-[var(--bg-tertiary)] rounded-md">
-            <span className="text-sm font-medium text-[var(--text-primary)]">
-              Enable for this tenant
-            </span>
-            <button
-              type="button"
-              onClick={() => setEnableOverride(!enableOverride)}
-              className={`p-1 ${enableOverride ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'}`}
-            >
-              {enableOverride ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
-            </button>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 p-4 border-t border-[var(--border-primary)]">
+    <SlideOutPanel
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Add Tenant Override"
+      width="sm"
+      footer={
+        <div className="flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
@@ -284,8 +210,71 @@ function OverrideModal({
             Add Override
           </button>
         </div>
+      }
+    >
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+            Search Tenant
+          </label>
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setSelectedTenantId('');
+              }}
+              placeholder="Search by tenant name..."
+              className="w-full pl-9 pr-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
+            />
+          </div>
+          {searchQuery.length >= 2 && (
+            <div className="mt-2 max-h-40 overflow-y-auto border border-[var(--border-primary)] rounded-md">
+              {isSearching ? (
+                <div className="p-3 text-center">
+                  <Loader2 className="w-4 h-4 animate-spin inline" />
+                </div>
+              ) : tenantResults.length > 0 ? (
+                tenantResults.map(tenant => (
+                  <button
+                    key={tenant.id}
+                    onClick={() => {
+                      setSelectedTenantId(tenant.id);
+                      setSearchQuery(tenant.name);
+                    }}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-[var(--hover-overlay)] ${
+                      selectedTenantId === tenant.id ? 'bg-[var(--color-brand-subtle)]' : ''
+                    }`}
+                  >
+                    <span className="text-[var(--text-primary)]">{tenant.name}</span>
+                    <span className="text-xs text-[var(--text-muted)] ml-2">{tenant.subdomain}</span>
+                  </button>
+                ))
+              ) : (
+                <div className="p-3 text-center text-sm text-[var(--text-muted)]">
+                  No tenants found
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between p-3 bg-[var(--bg-tertiary)] rounded-md">
+          <span className="text-sm font-medium text-[var(--text-primary)]">
+            Enable for this tenant
+          </span>
+          <button
+            type="button"
+            onClick={() => setEnableOverride(!enableOverride)}
+            className={`p-1 ${enableOverride ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'}`}
+          >
+            {enableOverride ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+          </button>
+        </div>
       </div>
-    </div>
+    </SlideOutPanel>
   );
 }
 
@@ -442,12 +431,11 @@ function FlagRow({
         )}
       </div>
 
-      {showOverrideModal && (
-        <OverrideModal
-          flagId={flag.id}
-          onClose={() => setShowOverrideModal(false)}
-        />
-      )}
+      <OverridePanel
+        flagId={flag.id}
+        isOpen={showOverrideModal}
+        onClose={() => setShowOverrideModal(false)}
+      />
     </>
   );
 }
@@ -537,18 +525,17 @@ export function FeatureFlags() {
         </div>
       )}
 
-      {/* Modal */}
-      {showModal && (
-        <FlagModal
-          flag={editingFlag}
-          onClose={() => {
-            setShowModal(false);
-            setEditingFlag(undefined);
-          }}
-          onSave={handleSave}
-          isSaving={createFlag.isPending || updateFlag.isPending}
-        />
-      )}
+      {/* Panel */}
+      <FlagPanel
+        flag={editingFlag}
+        isOpen={showModal}
+        onClose={() => {
+          setShowModal(false);
+          setEditingFlag(undefined);
+        }}
+        onSave={handleSave}
+        isSaving={createFlag.isPending || updateFlag.isPending}
+      />
     </div>
   );
 }

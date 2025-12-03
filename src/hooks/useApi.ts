@@ -10,12 +10,14 @@ import type {
   UpdateBroadcastInput,
   CreateFeatureFlagInput,
   UpdateFeatureFlagInput,
+  OpsSettings,
 } from '@/types';
 
 // Query keys
 export const queryKeys = {
   search: (query: string) => ['search', query] as const,
   tenant: (id: string) => ['tenant', id] as const,
+  tenants: (params?: Record<string, unknown>) => ['tenants', params] as const,
   tenantUsers: (id: string) => ['tenant', id, 'users'] as const,
   incidents: (params?: { status?: string }) => ['incidents', params] as const,
   incident: (id: string) => ['incident', id] as const,
@@ -33,6 +35,12 @@ export const queryKeys = {
   activeBroadcasts: ['broadcasts', 'active'] as const,
   featureFlags: ['feature-flags'] as const,
   featureFlag: (id: string) => ['feature-flag', id] as const,
+  analytics: (period: string) => ['analytics', period] as const,
+  settings: ['settings'] as const,
+  apiKeys: ['api-keys'] as const,
+  dbTables: ['db-tables'] as const,
+  dbSchema: (table: string) => ['db-schema', table] as const,
+  savedQueries: ['saved-queries'] as const,
 };
 
 // Support hooks
@@ -383,6 +391,130 @@ export function useRemoveFeatureFlagOverride(flagId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.featureFlag(flagId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.featureFlags });
+    },
+  });
+}
+
+// Tenants list hook (for selectors)
+export function useTenants(params?: { search?: string; status?: string; limit?: number }) {
+  return useQuery({
+    queryKey: queryKeys.tenants(params),
+    queryFn: () => api.getTenants(params),
+  });
+}
+
+// Analytics hooks
+export function useAnalytics(period: string = '30d') {
+  return useQuery({
+    queryKey: queryKeys.analytics(period),
+    queryFn: () => api.getAnalytics(period),
+  });
+}
+
+// Settings hooks
+export function useSettings() {
+  return useQuery({
+    queryKey: queryKeys.settings,
+    queryFn: () => api.getSettings(),
+  });
+}
+
+export function useUpdateSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<OpsSettings>) => api.updateSettings(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.settings });
+    },
+  });
+}
+
+// API Keys hooks
+export function useApiKeys() {
+  return useQuery({
+    queryKey: queryKeys.apiKeys,
+    queryFn: () => api.getApiKeys(),
+  });
+}
+
+export function useCreateApiKey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => api.createApiKey(name),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys });
+    },
+  });
+}
+
+export function useRevokeApiKey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.revokeApiKey(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys });
+    },
+  });
+}
+
+// API Proxy hook
+export function useApiProxy() {
+  return useMutation({
+    mutationFn: (params: {
+      method: string;
+      path: string;
+      headers?: Record<string, string>;
+      body?: unknown;
+      tenantId?: string;
+    }) => api.apiProxy(params),
+  });
+}
+
+// Database explorer hooks
+export function useDbTables() {
+  return useQuery({
+    queryKey: queryKeys.dbTables,
+    queryFn: () => api.getDbTables(),
+  });
+}
+
+export function useDbSchema(table: string) {
+  return useQuery({
+    queryKey: queryKeys.dbSchema(table),
+    queryFn: () => api.getDbSchema(table),
+    enabled: !!table,
+  });
+}
+
+export function useDbQuery() {
+  return useMutation({
+    mutationFn: (query: string) => api.executeDbQuery(query),
+  });
+}
+
+export function useSavedQueries() {
+  return useQuery({
+    queryKey: queryKeys.savedQueries,
+    queryFn: () => api.getSavedQueries(),
+  });
+}
+
+export function useSaveQuery() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name, query }: { name: string; query: string }) => api.saveQuery(name, query),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.savedQueries });
+    },
+  });
+}
+
+export function useDeleteSavedQuery() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteSavedQuery(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.savedQueries });
     },
   });
 }

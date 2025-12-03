@@ -4,6 +4,7 @@ import type {
   SearchResult,
   TenantDetail,
   TenantUser,
+  Tenant,
   Incident,
   IncidentWithUpdates,
   IncidentUpdate,
@@ -28,6 +29,12 @@ import type {
   CreateFeatureFlagInput,
   UpdateFeatureFlagInput,
   FeatureFlagOverride,
+  AnalyticsData,
+  OpsSettings,
+  ApiKey,
+  DbTableSchema,
+  DbQueryResult,
+  SavedQuery,
 } from '@/types';
 
 class ApiClient {
@@ -349,6 +356,116 @@ class ApiClient {
   // Public feature flags endpoint (for BarkBase app)
   async getTenantFeatures(tenantId: string): Promise<{ features: string[] }> {
     return this.request(`${API_ENDPOINTS.publicFeatures}?tenant_id=${tenantId}`, {}, false);
+  }
+
+  // Tenants list endpoint
+  async getTenants(params?: {
+    search?: string;
+    status?: string;
+    limit?: number;
+  }): Promise<{ tenants: Tenant[] }> {
+    const searchParams = new URLSearchParams();
+    if (params?.search) searchParams.set('search', params.search);
+    if (params?.status) searchParams.set('status', params.status);
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+
+    const query = searchParams.toString();
+    const endpoint = query ? `${API_ENDPOINTS.tenants}?${query}` : API_ENDPOINTS.tenants;
+    return this.request(endpoint);
+  }
+
+  // Analytics endpoints
+  async getAnalytics(period: string = '30d'): Promise<AnalyticsData> {
+    return this.request(`${API_ENDPOINTS.analytics}?period=${period}`);
+  }
+
+  // Settings endpoints
+  async getSettings(): Promise<OpsSettings> {
+    return this.request(API_ENDPOINTS.settings);
+  }
+
+  async updateSettings(data: Partial<OpsSettings>): Promise<OpsSettings> {
+    return this.request(API_ENDPOINTS.settings, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // API Keys endpoints
+  async getApiKeys(): Promise<{ keys: ApiKey[] }> {
+    return this.request(API_ENDPOINTS.apiKeys);
+  }
+
+  async createApiKey(name: string): Promise<{ key: ApiKey; secret: string }> {
+    return this.request(API_ENDPOINTS.apiKeys, {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  async revokeApiKey(id: string): Promise<{ success: boolean }> {
+    return this.request(API_ENDPOINTS.apiKey(id), {
+      method: 'DELETE',
+    });
+  }
+
+  // API Proxy endpoint
+  async apiProxy(params: {
+    method: string;
+    path: string;
+    headers?: Record<string, string>;
+    body?: unknown;
+    tenantId?: string;
+  }): Promise<{
+    status: number;
+    statusText: string;
+    headers: Record<string, string>;
+    body: unknown;
+    duration: number;
+  }> {
+    return this.request(API_ENDPOINTS.apiProxy, {
+      method: 'POST',
+      body: JSON.stringify({
+        method: params.method,
+        path: params.path,
+        headers: params.headers,
+        body: params.body,
+        tenant_id: params.tenantId,
+      }),
+    });
+  }
+
+  // Database explorer endpoints
+  async getDbTables(): Promise<{ tables: string[] }> {
+    return this.request(API_ENDPOINTS.dbTables);
+  }
+
+  async getDbSchema(table: string): Promise<{ schema: DbTableSchema[] }> {
+    return this.request(API_ENDPOINTS.dbSchema(table));
+  }
+
+  async executeDbQuery(query: string): Promise<DbQueryResult> {
+    return this.request(API_ENDPOINTS.dbQuery, {
+      method: 'POST',
+      body: JSON.stringify({ query }),
+    });
+  }
+
+  async getSavedQueries(): Promise<{ queries: SavedQuery[] }> {
+    return this.request(API_ENDPOINTS.savedQueries);
+  }
+
+  async saveQuery(name: string, query: string): Promise<SavedQuery> {
+    return this.request(API_ENDPOINTS.savedQueries, {
+      method: 'POST',
+      body: JSON.stringify({ name, query }),
+    });
+  }
+
+  async deleteSavedQuery(id: string): Promise<{ success: boolean }> {
+    return this.request(API_ENDPOINTS.savedQuery(id), {
+      method: 'DELETE',
+    });
   }
 }
 

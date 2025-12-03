@@ -153,14 +153,13 @@ export function Incidents() {
         </div>
       )}
 
-      {/* Create Incident Modal */}
-      {showForm && (
-        <IncidentForm
-          onSubmit={handleCreateIncident}
-          onCancel={() => setShowForm(false)}
-          isLoading={createIncident.isPending}
-        />
-      )}
+      {/* Create Incident Panel */}
+      <IncidentForm
+        isOpen={showForm}
+        onSubmit={handleCreateIncident}
+        onCancel={() => setShowForm(false)}
+        isLoading={createIncident.isPending}
+      />
     </div>
   );
 }

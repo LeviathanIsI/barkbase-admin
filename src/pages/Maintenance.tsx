@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { format, isWithinInterval, isFuture, isPast } from 'date-fns';
-import { Loader2, Calendar, Plus, X, Clock, CheckCircle, XCircle, Wrench, Edit, Trash2 } from 'lucide-react';
+import { Loader2, Calendar, Plus, Clock, CheckCircle, XCircle, Wrench, Edit, Trash2 } from 'lucide-react';
 import { useMaintenanceList, useCreateMaintenance, useUpdateMaintenance, useDeleteMaintenance } from '@/hooks/useApi';
+import { SlideOutPanel } from '@/components/ui/SlideOutPanel';
 import type { ScheduledMaintenance, MaintenanceStatus, CreateMaintenanceInput, UpdateMaintenanceInput } from '@/types';
 
 const COMPONENTS = [
@@ -58,13 +59,15 @@ interface MaintenanceFormData {
   notifyCustomers: boolean;
 }
 
-function MaintenanceModal({
+function MaintenancePanel({
   maintenance,
+  isOpen,
   onClose,
   onSave,
   isSaving,
 }: {
   maintenance?: ScheduledMaintenance;
+  isOpen: boolean;
   onClose: () => void;
   onSave: (data: CreateMaintenanceInput | UpdateMaintenanceInput) => void;
   isSaving: boolean;
@@ -104,113 +107,13 @@ function MaintenanceModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[var(--z-modal)]">
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg w-full max-w-lg max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-[var(--border-primary)]">
-          <h3 className="text-base font-semibold text-[var(--text-primary)]">
-            {maintenance ? 'Edit Maintenance' : 'Schedule Maintenance'}
-          </h3>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-md hover:bg-[var(--hover-overlay)] text-[var(--text-muted)]"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto flex-1">
-          <div>
-            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-              Title <span className="text-[var(--color-error)]">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.title}
-              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-              required
-              placeholder="e.g., Database Migration"
-              className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-              Description
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              rows={3}
-              placeholder="Describe the maintenance work..."
-              className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)] resize-none"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                Start Time <span className="text-[var(--color-error)]">*</span>
-              </label>
-              <input
-                type="datetime-local"
-                value={formData.scheduledStart}
-                onChange={(e) => setFormData(prev => ({ ...prev, scheduledStart: e.target.value }))}
-                required
-                className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                End Time <span className="text-[var(--color-error)]">*</span>
-              </label>
-              <input
-                type="datetime-local"
-                value={formData.scheduledEnd}
-                onChange={(e) => setFormData(prev => ({ ...prev, scheduledEnd: e.target.value }))}
-                required
-                className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-              Affected Components
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {COMPONENTS.map(component => (
-                <button
-                  key={component}
-                  type="button"
-                  onClick={() => toggleComponent(component)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                    formData.affectedComponents.includes(component)
-                      ? 'bg-[var(--color-brand)] text-white'
-                      : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--hover-overlay)]'
-                  }`}
-                >
-                  {component}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.notifyCustomers}
-                onChange={(e) => setFormData(prev => ({ ...prev, notifyCustomers: e.target.checked }))}
-                className="w-4 h-4 rounded border-[var(--border-primary)] text-[var(--color-brand)] focus:ring-[var(--color-brand)]"
-              />
-              <span className="text-sm text-[var(--text-secondary)]">
-                Notify customers about this maintenance
-              </span>
-            </label>
-          </div>
-        </form>
-
-        <div className="flex justify-end gap-2 p-4 border-t border-[var(--border-primary)]">
+    <SlideOutPanel
+      isOpen={isOpen}
+      onClose={onClose}
+      title={maintenance ? 'Edit Maintenance' : 'Schedule Maintenance'}
+      width="md"
+      footer={
+        <div className="flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
@@ -227,8 +130,100 @@ function MaintenanceModal({
             {maintenance ? 'Update' : 'Schedule'}
           </button>
         </div>
-      </div>
-    </div>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+            Title <span className="text-[var(--color-error)]">*</span>
+          </label>
+          <input
+            type="text"
+            value={formData.title}
+            onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+            required
+            placeholder="e.g., Database Migration"
+            className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+            Description
+          </label>
+          <textarea
+            value={formData.description}
+            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+            rows={3}
+            placeholder="Describe the maintenance work..."
+            className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)] resize-none"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+              Start Time <span className="text-[var(--color-error)]">*</span>
+            </label>
+            <input
+              type="datetime-local"
+              value={formData.scheduledStart}
+              onChange={(e) => setFormData(prev => ({ ...prev, scheduledStart: e.target.value }))}
+              required
+              className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+              End Time <span className="text-[var(--color-error)]">*</span>
+            </label>
+            <input
+              type="datetime-local"
+              value={formData.scheduledEnd}
+              onChange={(e) => setFormData(prev => ({ ...prev, scheduledEnd: e.target.value }))}
+              required
+              className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+            Affected Components
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {COMPONENTS.map(component => (
+              <button
+                key={component}
+                type="button"
+                onClick={() => toggleComponent(component)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  formData.affectedComponents.includes(component)
+                    ? 'bg-[var(--color-brand)] text-white'
+                    : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--hover-overlay)]'
+                }`}
+              >
+                {component}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.notifyCustomers}
+              onChange={(e) => setFormData(prev => ({ ...prev, notifyCustomers: e.target.checked }))}
+              className="w-4 h-4 rounded border-[var(--border-primary)] text-[var(--color-brand)] focus:ring-[var(--color-brand)]"
+            />
+            <span className="text-sm text-[var(--text-secondary)]">
+              Notify customers about this maintenance
+            </span>
+          </label>
+        </div>
+      </form>
+    </SlideOutPanel>
   );
 }
 
@@ -451,18 +446,17 @@ export function Maintenance() {
         </div>
       )}
 
-      {/* Modal */}
-      {showModal && (
-        <MaintenanceModal
-          maintenance={editingMaintenance}
-          onClose={() => {
-            setShowModal(false);
-            setEditingMaintenance(undefined);
-          }}
-          onSave={handleSave}
-          isSaving={createMaintenance.isPending || updateMaintenance.isPending}
-        />
-      )}
+      {/* Panel */}
+      <MaintenancePanel
+        maintenance={editingMaintenance}
+        isOpen={showModal}
+        onClose={() => {
+          setShowModal(false);
+          setEditingMaintenance(undefined);
+        }}
+        onSave={handleSave}
+        isSaving={createMaintenance.isPending || updateMaintenance.isPending}
+      />
     </div>
   );
 }

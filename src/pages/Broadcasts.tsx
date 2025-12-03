@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { format, isPast, isFuture } from 'date-fns';
-import { Loader2, Megaphone, Plus, X, Edit, Trash2, Info, AlertTriangle, AlertCircle, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Loader2, Megaphone, Plus, Edit, Trash2, Info, AlertTriangle, AlertCircle, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useBroadcasts, useCreateBroadcast, useUpdateBroadcast, useDeleteBroadcast } from '@/hooks/useApi';
+import { SlideOutPanel } from '@/components/ui/SlideOutPanel';
 import type { Broadcast, BroadcastType, BroadcastTarget, BroadcastLocation, CreateBroadcastInput, UpdateBroadcastInput } from '@/types';
 
 const typeConfig: Record<BroadcastType, { color: string; bgColor: string; icon: typeof Info; label: string }> = {
@@ -60,13 +61,15 @@ interface BroadcastFormData {
   expiresAt: string;
 }
 
-function BroadcastModal({
+function BroadcastPanel({
   broadcast,
+  isOpen,
   onClose,
   onSave,
   isSaving,
 }: {
   broadcast?: Broadcast;
+  isOpen: boolean;
   onClose: () => void;
   onSave: (data: CreateBroadcastInput | UpdateBroadcastInput) => void;
   isSaving: boolean;
@@ -108,184 +111,13 @@ function BroadcastModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[var(--z-modal)]">
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-[var(--border-primary)]">
-          <h3 className="text-base font-semibold text-[var(--text-primary)]">
-            {broadcast ? 'Edit Broadcast' : 'New Broadcast'}
-          </h3>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-md hover:bg-[var(--hover-overlay)] text-[var(--text-muted)]"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="flex flex-1 overflow-hidden">
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="flex-1 p-4 space-y-4 overflow-y-auto border-r border-[var(--border-primary)]">
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                Title <span className="text-[var(--color-error)]">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                required
-                placeholder="e.g., New Feature: AI Scheduling"
-                className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                Message <span className="text-[var(--color-error)]">*</span>
-              </label>
-              <textarea
-                value={formData.message}
-                onChange={(e) => setFormData(prev => ({ ...prev, message: e.target.value }))}
-                required
-                rows={4}
-                placeholder="Markdown supported..."
-                className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)] resize-none font-mono"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                  Type
-                </label>
-                <div className="flex gap-2">
-                  {(Object.keys(typeConfig) as BroadcastType[]).map(type => {
-                    const config = typeConfig[type];
-                    const Icon = config.icon;
-                    return (
-                      <button
-                        key={type}
-                        type="button"
-                        onClick={() => setFormData(prev => ({ ...prev, type }))}
-                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
-                          formData.type === type
-                            ? `${config.bgColor} text-white`
-                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--hover-overlay)]'
-                        }`}
-                      >
-                        <Icon size={14} />
-                        {config.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                  Target Audience
-                </label>
-                <select
-                  value={formData.target}
-                  onChange={(e) => setFormData(prev => ({ ...prev, target: e.target.value as BroadcastTarget }))}
-                  className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
-                >
-                  {(Object.entries(targetLabels) as [BroadcastTarget, string][]).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                Display Locations
-              </label>
-              <div className="flex gap-2">
-                {(Object.entries(locationLabels) as [BroadcastLocation, string][]).map(([location, label]) => (
-                  <button
-                    key={location}
-                    type="button"
-                    onClick={() => toggleLocation(location)}
-                    className={`px-3 py-2 rounded-md text-xs font-medium transition-colors ${
-                      formData.displayLocations.includes(location)
-                        ? 'bg-[var(--color-brand)] text-white'
-                        : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--hover-overlay)]'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                  Start Time <span className="text-[var(--color-error)]">*</span>
-                </label>
-                <input
-                  type="datetime-local"
-                  value={formData.startsAt}
-                  onChange={(e) => setFormData(prev => ({ ...prev, startsAt: e.target.value }))}
-                  required
-                  className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                  Expiration (optional)
-                </label>
-                <input
-                  type="datetime-local"
-                  value={formData.expiresAt}
-                  onChange={(e) => setFormData(prev => ({ ...prev, expiresAt: e.target.value }))}
-                  className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
-                />
-              </div>
-            </div>
-          </form>
-
-          {/* Preview */}
-          <div className="w-80 p-4 overflow-y-auto bg-[var(--bg-tertiary)]">
-            <div className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-3">
-              Preview
-            </div>
-            <div className="space-y-3">
-              {formData.displayLocations.includes('app_banner') && (
-                <div>
-                  <div className="text-[10px] text-[var(--text-muted)] mb-1">In-App Banner</div>
-                  <div className={`p-3 rounded-md ${typeConfig[formData.type].bgColor} text-white`}>
-                    <div className="flex items-start gap-2">
-                      {(() => {
-                        const Icon = typeConfig[formData.type].icon;
-                        return <Icon size={16} className="flex-shrink-0 mt-0.5" />;
-                      })()}
-                      <div>
-                        <div className="font-medium text-sm">{formData.title || 'Title'}</div>
-                        <div className="text-xs opacity-90 mt-0.5">{formData.message || 'Message...'}</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {formData.displayLocations.includes('status_page') && (
-                <div>
-                  <div className="text-[10px] text-[var(--text-muted)] mb-1">Status Page</div>
-                  <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-md p-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <TypeBadge type={formData.type} />
-                    </div>
-                    <div className="font-medium text-sm text-[var(--text-primary)]">{formData.title || 'Title'}</div>
-                    <div className="text-xs text-[var(--text-muted)] mt-1">{formData.message || 'Message...'}</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 p-4 border-t border-[var(--border-primary)]">
+    <SlideOutPanel
+      isOpen={isOpen}
+      onClose={onClose}
+      title={broadcast ? 'Edit Broadcast' : 'New Broadcast'}
+      width="lg"
+      footer={
+        <div className="flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
@@ -302,8 +134,168 @@ function BroadcastModal({
             {broadcast ? 'Update' : 'Create'}
           </button>
         </div>
-      </div>
-    </div>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+            Title <span className="text-[var(--color-error)]">*</span>
+          </label>
+          <input
+            type="text"
+            value={formData.title}
+            onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+            required
+            placeholder="e.g., New Feature: AI Scheduling"
+            className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+            Message <span className="text-[var(--color-error)]">*</span>
+          </label>
+          <textarea
+            value={formData.message}
+            onChange={(e) => setFormData(prev => ({ ...prev, message: e.target.value }))}
+            required
+            rows={4}
+            placeholder="Markdown supported..."
+            className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)] resize-none font-mono"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+              Type
+            </label>
+            <div className="flex gap-2">
+              {(Object.keys(typeConfig) as BroadcastType[]).map(type => {
+                const config = typeConfig[type];
+                const Icon = config.icon;
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, type }))}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+                      formData.type === type
+                        ? `${config.bgColor} text-white`
+                        : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--hover-overlay)]'
+                    }`}
+                  >
+                    <Icon size={14} />
+                    {config.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+              Target Audience
+            </label>
+            <select
+              value={formData.target}
+              onChange={(e) => setFormData(prev => ({ ...prev, target: e.target.value as BroadcastTarget }))}
+              className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
+            >
+              {(Object.entries(targetLabels) as [BroadcastTarget, string][]).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+            Display Locations
+          </label>
+          <div className="flex gap-2">
+            {(Object.entries(locationLabels) as [BroadcastLocation, string][]).map(([location, label]) => (
+              <button
+                key={location}
+                type="button"
+                onClick={() => toggleLocation(location)}
+                className={`px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+                  formData.displayLocations.includes(location)
+                    ? 'bg-[var(--color-brand)] text-white'
+                    : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--hover-overlay)]'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+              Start Time <span className="text-[var(--color-error)]">*</span>
+            </label>
+            <input
+              type="datetime-local"
+              value={formData.startsAt}
+              onChange={(e) => setFormData(prev => ({ ...prev, startsAt: e.target.value }))}
+              required
+              className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+              Expiration (optional)
+            </label>
+            <input
+              type="datetime-local"
+              value={formData.expiresAt}
+              onChange={(e) => setFormData(prev => ({ ...prev, expiresAt: e.target.value }))}
+              className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-brand)]"
+            />
+          </div>
+        </div>
+
+        {/* Preview */}
+        <div className="pt-4 border-t border-[var(--border-primary)]">
+          <div className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-3">
+            Preview
+          </div>
+          <div className="space-y-3">
+            {formData.displayLocations.includes('app_banner') && (
+              <div>
+                <div className="text-[10px] text-[var(--text-muted)] mb-1">In-App Banner</div>
+                <div className={`p-3 rounded-md ${typeConfig[formData.type].bgColor} text-white`}>
+                  <div className="flex items-start gap-2">
+                    {(() => {
+                      const Icon = typeConfig[formData.type].icon;
+                      return <Icon size={16} className="flex-shrink-0 mt-0.5" />;
+                    })()}
+                    <div>
+                      <div className="font-medium text-sm">{formData.title || 'Title'}</div>
+                      <div className="text-xs opacity-90 mt-0.5">{formData.message || 'Message...'}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            {formData.displayLocations.includes('status_page') && (
+              <div>
+                <div className="text-[10px] text-[var(--text-muted)] mb-1">Status Page</div>
+                <div className="bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <TypeBadge type={formData.type} />
+                  </div>
+                  <div className="font-medium text-sm text-[var(--text-primary)]">{formData.title || 'Title'}</div>
+                  <div className="text-xs text-[var(--text-muted)] mt-1">{formData.message || 'Message...'}</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </form>
+    </SlideOutPanel>
   );
 }
 
@@ -507,18 +499,17 @@ export function Broadcasts() {
         </div>
       )}
 
-      {/* Modal */}
-      {showModal && (
-        <BroadcastModal
-          broadcast={editingBroadcast}
-          onClose={() => {
-            setShowModal(false);
-            setEditingBroadcast(undefined);
-          }}
-          onSave={handleSave}
-          isSaving={createBroadcast.isPending || updateBroadcast.isPending}
-        />
-      )}
+      {/* Panel */}
+      <BroadcastPanel
+        broadcast={editingBroadcast}
+        isOpen={showModal}
+        onClose={() => {
+          setShowModal(false);
+          setEditingBroadcast(undefined);
+        }}
+        onSave={handleSave}
+        isSaving={createBroadcast.isPending || updateBroadcast.isPending}
+      />
     </div>
   );
 }
