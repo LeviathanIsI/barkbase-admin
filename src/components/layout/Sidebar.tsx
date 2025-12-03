@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { Headphones, AlertTriangle, Activity, LogOut } from 'lucide-react';
+import { Headphones, AlertTriangle, Activity, Gauge, FileText, LogOut, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 const navItems = [
   { to: '/support', label: 'Support Desk', icon: Headphones },
   { to: '/incidents', label: 'Incidents', icon: AlertTriangle },
-  { to: '/status', label: 'Status Page', icon: Activity },
+  { to: '/command-center', label: 'Command Center', icon: Gauge },
+  { to: '/audit-logs', label: 'Audit Logs', icon: FileText },
 ];
 
 export function Sidebar() {
@@ -78,6 +79,27 @@ export function Sidebar() {
               </NavLink>
             </li>
           ))}
+        </ul>
+
+        {/* External Links Section */}
+        <div className="mt-6 mb-2 px-3">
+          <span className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
+            External
+          </span>
+        </div>
+        <ul className="space-y-1">
+          <li>
+            <a
+              href="/status"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--hover-overlay)] hover:text-[var(--text-primary)] transition-all"
+            >
+              <Activity size={18} className="flex-shrink-0" />
+              <span className="flex-1">Status Page</span>
+              <ExternalLink size={14} className="text-[var(--text-muted)]" />
+            </a>
+          </li>
         </ul>
       </nav>
 

@@ -20,6 +20,15 @@ export const API_ENDPOINTS = {
   incident: (id: string) => `/admin/incidents/${id}`,
   incidentUpdates: (id: string) => `/admin/incidents/${id}/updates`,
 
+  // Health monitoring endpoints
+  healthLambdas: '/admin/health/lambdas',
+  healthApi: '/admin/health/api',
+  healthDatabase: '/admin/health/database',
+  healthAlerts: '/admin/health/alerts',
+
+  // Audit log endpoints
+  auditLogs: '/admin/audit-logs',
+
   // Public status endpoints (no auth)
   status: '/status',
   statusBanner: '/status/banner',

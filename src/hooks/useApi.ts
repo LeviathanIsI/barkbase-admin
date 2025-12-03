@@ -15,6 +15,11 @@ export const queryKeys = {
   incident: (id: string) => ['incident', id] as const,
   status: ['status'] as const,
   statusBanner: ['status', 'banner'] as const,
+  healthLambdas: ['health', 'lambdas'] as const,
+  healthApi: ['health', 'api'] as const,
+  healthDatabase: ['health', 'database'] as const,
+  healthAlerts: ['health', 'alerts'] as const,
+  auditLogs: (params?: Record<string, unknown>) => ['audit-logs', params] as const,
 };
 
 // Support hooks
@@ -126,6 +131,54 @@ export function useAddIncidentUpdate(incidentId: string) {
       queryClient.invalidateQueries({ queryKey: queryKeys.incident(incidentId) });
       queryClient.invalidateQueries({ queryKey: ['incidents'] });
     },
+  });
+}
+
+// Health monitoring hooks
+export function useHealthLambdas() {
+  return useQuery({
+    queryKey: queryKeys.healthLambdas,
+    queryFn: () => api.getHealthLambdas(),
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+}
+
+export function useHealthApi() {
+  return useQuery({
+    queryKey: queryKeys.healthApi,
+    queryFn: () => api.getHealthApi(),
+    refetchInterval: 30000,
+  });
+}
+
+export function useHealthDatabase() {
+  return useQuery({
+    queryKey: queryKeys.healthDatabase,
+    queryFn: () => api.getHealthDatabase(),
+    refetchInterval: 30000,
+  });
+}
+
+export function useHealthAlerts() {
+  return useQuery({
+    queryKey: queryKeys.healthAlerts,
+    queryFn: () => api.getHealthAlerts(),
+    refetchInterval: 30000,
+  });
+}
+
+// Audit log hooks
+export function useAuditLogs(params?: {
+  page?: number;
+  action?: string;
+  admin?: string;
+  targetType?: string;
+  from?: string;
+  to?: string;
+}) {
+  return useQuery({
+    queryKey: queryKeys.auditLogs(params),
+    queryFn: () => api.getAuditLogs(params),
   });
 }
 

@@ -19,12 +19,13 @@ export interface Tenant {
   id: string;
   name: string;
   subdomain: string;
-  status: 'active' | 'inactive' | 'suspended';
+  status: 'active' | 'inactive' | 'suspended' | 'trial';
   createdAt: string;
   userCount?: number;
   petCount?: number;
   bookingCount?: number;
   plan?: string;
+  trialEndsAt?: string;
 }
 
 export interface TenantUser {
@@ -37,9 +38,27 @@ export interface TenantUser {
   lastLoginAt?: string;
 }
 
+export interface TenantStats {
+  totalPets: number;
+  totalBookings: number;
+  totalRevenue: number;
+  bookingsThisMonth: number;
+  activeUsers: number;
+}
+
+export interface TenantActivity {
+  id: string;
+  type: string;
+  description: string;
+  timestamp: string;
+  userName?: string;
+}
+
 export interface TenantDetail extends Tenant {
   users: TenantUser[];
-  recentActivity?: ActivityLog[];
+  stats?: TenantStats;
+  recentActivity?: TenantActivity[];
+  settings?: Record<string, unknown>;
 }
 
 export interface ActivityLog {
@@ -57,8 +76,15 @@ export interface SearchResult {
   id: string;
   name: string;
   email?: string;
+  role?: string;
+  subdomain?: string;
+  status?: string;
+  plan?: string;
+  userCount?: number;
   tenantName?: string;
   tenantId?: string;
+  lastLogin?: string;
+  createdAt?: string;
 }
 
 // Incident types
@@ -145,6 +171,57 @@ export interface StatusBanner {
   url?: string;
 }
 
+// Health monitoring types
+export interface LambdaHealth {
+  name: string;
+  status: 'healthy' | 'degraded' | 'error';
+  invocations: number;
+  errors: number;
+  avgDuration: number;
+  p99Duration: number;
+}
+
+export interface ApiHealth {
+  requestsPerMinute: number;
+  errorRate: number;
+  latency: {
+    p50: number;
+    p95: number;
+    p99: number;
+  };
+  statusCodes: {
+    '2xx': number;
+    '4xx': number;
+    '5xx': number;
+  };
+}
+
+export interface DatabaseHealth {
+  connections: number;
+  maxConnections: number;
+  cpuUtilization: number;
+  storageUsed: number;
+  storageTotal: number;
+  status: 'healthy' | 'degraded' | 'error';
+}
+
+export interface HealthAlert {
+  id: string;
+  name: string;
+  state: 'ALARM' | 'OK' | 'INSUFFICIENT_DATA';
+  metric: string;
+  threshold: number;
+  currentValue: number;
+  updatedAt: string;
+}
+
+export interface HealthAlertsSummary {
+  total: number;
+  alarm: number;
+  ok: number;
+  insufficientData: number;
+}
+
 // Audit log types
 export interface AuditLogEntry {
   id: string;
@@ -156,6 +233,25 @@ export interface AuditLogEntry {
   details?: Record<string, unknown>;
   ipAddress?: string;
   createdAt: string;
+}
+
+export interface AuditLogFilters {
+  admins: { id: string; email: string }[];
+  actions: string[];
+  targetTypes: string[];
+}
+
+export interface AuditLogPagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface AuditLogResponse {
+  logs: AuditLogEntry[];
+  pagination: AuditLogPagination;
+  filters: AuditLogFilters;
 }
 
 // API response types

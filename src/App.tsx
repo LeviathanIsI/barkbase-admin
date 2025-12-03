@@ -7,6 +7,8 @@ import { Login } from '@/pages/Login';
 import { Support } from '@/pages/Support';
 import { Incidents } from '@/pages/Incidents';
 import { IncidentDetailPage } from '@/pages/IncidentDetailPage';
+import { CommandCenter } from '@/pages/CommandCenter';
+import { AuditLogs } from '@/pages/AuditLogs';
 import { StatusPage } from '@/pages/StatusPage';
 
 const queryClient = new QueryClient({
@@ -40,6 +42,8 @@ function App() {
               <Route path="/support" element={<Support />} />
               <Route path="/incidents" element={<Incidents />} />
               <Route path="/incidents/:id" element={<IncidentDetailPage />} />
+              <Route path="/command-center" element={<CommandCenter />} />
+              <Route path="/audit-logs" element={<AuditLogs />} />
             </Route>
 
             {/* Fallback */}

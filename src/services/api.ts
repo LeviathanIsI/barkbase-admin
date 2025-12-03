@@ -12,6 +12,12 @@ import type {
   CreateIncidentUpdateInput,
   StatusResponse,
   StatusBanner,
+  LambdaHealth,
+  ApiHealth,
+  DatabaseHealth,
+  HealthAlert,
+  HealthAlertsSummary,
+  AuditLogResponse,
 } from '@/types';
 
 class ApiClient {
@@ -140,6 +146,45 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  }
+
+  // Health monitoring endpoints
+  async getHealthLambdas(): Promise<{ lambdas: LambdaHealth[] }> {
+    return this.request(API_ENDPOINTS.healthLambdas);
+  }
+
+  async getHealthApi(): Promise<ApiHealth> {
+    return this.request(API_ENDPOINTS.healthApi);
+  }
+
+  async getHealthDatabase(): Promise<{ ops: DatabaseHealth; barkbase: DatabaseHealth }> {
+    return this.request(API_ENDPOINTS.healthDatabase);
+  }
+
+  async getHealthAlerts(): Promise<{ alerts: HealthAlert[]; summary: HealthAlertsSummary }> {
+    return this.request(API_ENDPOINTS.healthAlerts);
+  }
+
+  // Audit log endpoints
+  async getAuditLogs(params?: {
+    page?: number;
+    action?: string;
+    admin?: string;
+    targetType?: string;
+    from?: string;
+    to?: string;
+  }): Promise<AuditLogResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.action) searchParams.set('action', params.action);
+    if (params?.admin) searchParams.set('admin', params.admin);
+    if (params?.targetType) searchParams.set('target_type', params.targetType);
+    if (params?.from) searchParams.set('from', params.from);
+    if (params?.to) searchParams.set('to', params.to);
+
+    const query = searchParams.toString();
+    const endpoint = query ? `${API_ENDPOINTS.auditLogs}?${query}` : API_ENDPOINTS.auditLogs;
+    return this.request(endpoint);
   }
 
   // Public status endpoints (no auth)
