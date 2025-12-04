@@ -14,192 +14,34 @@ import {
   Bell,
   Plus,
   X,
+  Loader2,
 } from 'lucide-react';
 import { SlideOutPanel } from '@/components/ui/SlideOutPanel';
+import {
+  useHealthScores,
+  useHealthScoresStats,
+  useChurnAlerts,
+  useAcknowledgeChurnAlert,
+} from '@/hooks/useApi';
+import type { TenantHealthScore, ChurnAlert, HealthTrend, HealthScoreStats } from '@/types';
 
-type HealthFilter = 'all' | 'at_risk' | 'needs_attention' | 'healthy';
-type TrendDirection = 'up' | 'down' | 'stable';
-
-interface HealthBreakdown {
-  loginFrequency: number;
-  featureAdoption: number;
-  bookingTrend: number;
-  supportSentiment: number;
-  paymentHistory: number;
-  userEngagement: number;
-}
-
-interface TenantHealth {
-  id: string;
-  name: string;
-  subdomain: string;
-  plan: string;
-  healthScore: number;
-  trend: TrendDirection;
-  trendChange: number;
-  daysSinceLogin: number;
-  breakdown: HealthBreakdown;
-  riskFactors: string[];
-  lastActivity: string;
-}
-
-interface ChurnAlert {
-  id: string;
-  tenantId: string;
-  tenantName: string;
-  type: 'score_drop' | 'no_login' | 'payment_failed';
-  message: string;
-  createdAt: string;
-  acknowledged: boolean;
-}
-
-// Mock data
-const MOCK_TENANTS: TenantHealth[] = [
-  {
-    id: '1',
-    name: 'Happy Paws Grooming',
-    subdomain: 'happypaws',
-    plan: 'enterprise',
-    healthScore: 92,
-    trend: 'up',
-    trendChange: 5,
-    daysSinceLogin: 0,
-    breakdown: {
-      loginFrequency: 95,
-      featureAdoption: 88,
-      bookingTrend: 92,
-      supportSentiment: 90,
-      paymentHistory: 100,
-      userEngagement: 85,
-    },
-    riskFactors: [],
-    lastActivity: '2 hours ago',
-  },
-  {
-    id: '2',
-    name: 'Bark & Bath',
-    subdomain: 'barkbath',
-    plan: 'pro',
-    healthScore: 67,
-    trend: 'down',
-    trendChange: -8,
-    daysSinceLogin: 3,
-    breakdown: {
-      loginFrequency: 60,
-      featureAdoption: 72,
-      bookingTrend: 55,
-      supportSentiment: 70,
-      paymentHistory: 100,
-      userEngagement: 45,
-    },
-    riskFactors: ['Booking volume declining', 'Low user engagement'],
-    lastActivity: '3 days ago',
-  },
-  {
-    id: '3',
-    name: 'Pawsome Care',
-    subdomain: 'pawsome',
-    plan: 'pro',
-    healthScore: 34,
-    trend: 'down',
-    trendChange: -18,
-    daysSinceLogin: 16,
-    breakdown: {
-      loginFrequency: 20,
-      featureAdoption: 45,
-      bookingTrend: 30,
-      supportSentiment: 40,
-      paymentHistory: 80,
-      userEngagement: 25,
-    },
-    riskFactors: ['No login in 14+ days', 'Score dropped 18 points', 'Booking volume -45%'],
-    lastActivity: '16 days ago',
-  },
-  {
-    id: '4',
-    name: 'The Dog House',
-    subdomain: 'doghouse',
-    plan: 'enterprise',
-    healthScore: 78,
-    trend: 'stable',
-    trendChange: 0,
-    daysSinceLogin: 1,
-    breakdown: {
-      loginFrequency: 85,
-      featureAdoption: 70,
-      bookingTrend: 80,
-      supportSentiment: 75,
-      paymentHistory: 100,
-      userEngagement: 60,
-    },
-    riskFactors: [],
-    lastActivity: 'Yesterday',
-  },
-  {
-    id: '5',
-    name: 'Fluffy Friends',
-    subdomain: 'fluffy',
-    plan: 'free',
-    healthScore: 45,
-    trend: 'down',
-    trendChange: -12,
-    daysSinceLogin: 8,
-    breakdown: {
-      loginFrequency: 40,
-      featureAdoption: 30,
-      bookingTrend: 50,
-      supportSentiment: 60,
-      paymentHistory: 100,
-      userEngagement: 35,
-    },
-    riskFactors: ['Low feature adoption', 'Declining engagement'],
-    lastActivity: '8 days ago',
-  },
-];
-
-const MOCK_ALERTS: ChurnAlert[] = [
-  {
-    id: '1',
-    tenantId: '3',
-    tenantName: 'Pawsome Care',
-    type: 'score_drop',
-    message: 'Health score dropped 18 points in the last 7 days',
-    createdAt: '2024-01-15T10:00:00Z',
-    acknowledged: false,
-  },
-  {
-    id: '2',
-    tenantId: '3',
-    tenantName: 'Pawsome Care',
-    type: 'no_login',
-    message: 'No user logins in 16 days',
-    createdAt: '2024-01-14T10:00:00Z',
-    acknowledged: false,
-  },
-  {
-    id: '3',
-    tenantId: '5',
-    tenantName: 'Fluffy Friends',
-    type: 'score_drop',
-    message: 'Health score dropped 12 points in the last 7 days',
-    createdAt: '2024-01-13T10:00:00Z',
-    acknowledged: true,
-  },
-];
+type HealthFilter = 'all' | 'at_risk' | 'needs_attention' | 'good' | 'excellent';
 
 function getHealthColor(score: number): string {
-  if (score >= 70) return 'var(--color-success)';
-  if (score >= 40) return 'var(--color-warning)';
-  return 'var(--color-error)';
+  if (score >= 90) return 'var(--color-success)';   // 🟢 Excellent
+  if (score >= 70) return 'var(--color-warning)';   // 🟡 Good (yellow/gold)
+  if (score >= 50) return 'var(--color-orange)';    // 🟠 Needs attention
+  return 'var(--color-error)';                       // 🔴 Critical
 }
 
 function getHealthBand(score: number): string {
-  if (score >= 70) return 'Healthy';
-  if (score >= 40) return 'Needs Attention';
+  if (score >= 90) return 'Excellent';
+  if (score >= 70) return 'Good';
+  if (score >= 50) return 'Needs Attention';
   return 'At Risk';
 }
 
-function TrendIndicator({ trend, change }: { trend: TrendDirection; change: number }) {
+function TrendIndicator({ trend, change }: { trend: HealthTrend; change: number }) {
   if (trend === 'up') {
     return (
       <span className="flex items-center gap-0.5 text-xs text-[var(--color-success)]">
@@ -284,28 +126,40 @@ function BreakdownBar({ label, value, icon: Icon }: { label: string; value: numb
 
 export function CustomerHealth() {
   const [filter, setFilter] = useState<HealthFilter>('all');
-  const [selectedTenant, setSelectedTenant] = useState<TenantHealth | null>(null);
+  const [selectedTenant, setSelectedTenant] = useState<TenantHealthScore | null>(null);
   const [showAlerts, setShowAlerts] = useState(true);
   const [showAddNote, setShowAddNote] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [followUpDate, setFollowUpDate] = useState('');
 
-  const filteredTenants = MOCK_TENANTS.filter(tenant => {
-    if (filter === 'all') return true;
-    if (filter === 'at_risk') return tenant.healthScore < 40;
-    if (filter === 'needs_attention') return tenant.healthScore >= 40 && tenant.healthScore < 70;
-    if (filter === 'healthy') return tenant.healthScore >= 70;
-    return true;
-  }).sort((a, b) => a.healthScore - b.healthScore);
+  // API hooks
+  const { data: healthScoresData, isLoading: isLoadingScores } = useHealthScores(filter === 'all' ? undefined : filter);
+  const { data: statsData, isLoading: isLoadingStats } = useHealthScoresStats();
+  const { data: alertsData, isLoading: isLoadingAlerts } = useChurnAlerts();
+  const acknowledgeAlert = useAcknowledgeChurnAlert();
 
-  const unacknowledgedAlerts = MOCK_ALERTS.filter(a => !a.acknowledged);
+  const isLoading = isLoadingScores || isLoadingStats || isLoadingAlerts;
 
-  const stats = {
-    atRisk: MOCK_TENANTS.filter(t => t.healthScore < 40).length,
-    needsAttention: MOCK_TENANTS.filter(t => t.healthScore >= 40 && t.healthScore < 70).length,
-    healthy: MOCK_TENANTS.filter(t => t.healthScore >= 70).length,
-    avgScore: Math.round(MOCK_TENANTS.reduce((sum, t) => sum + t.healthScore, 0) / MOCK_TENANTS.length),
+  const healthScores = healthScoresData?.scores || [];
+  const stats = statsData?.stats;
+  const alerts = alertsData?.alerts || [];
+
+  const filteredTenants = [...healthScores].sort((a: TenantHealthScore, b: TenantHealthScore) => a.healthScore - b.healthScore);
+  const unacknowledgedAlerts = alerts.filter((a: ChurnAlert) => !a.acknowledged);
+
+  const handleAcknowledgeAlert = (alertId: string) => {
+    acknowledgeAlert.mutate(alertId);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--color-brand)]" />
+      </div>
+    );
+  }
+
+  const displayStats: HealthScoreStats = stats || { atRisk: 0, needsAttention: 0, good: 0, excellent: 0, healthy: 0, avgScore: 0, total: 0 };
 
   return (
     <div className="space-y-6">
@@ -349,7 +203,10 @@ export function CustomerHealth() {
                   <span className="text-sm font-medium text-[var(--text-primary)]">{alert.tenantName}</span>
                   <span className="text-sm text-[var(--text-muted)] ml-2">— {alert.message}</span>
                 </div>
-                <button className="text-xs text-[var(--color-brand)] hover:underline">
+                <button 
+                  onClick={() => handleAcknowledgeAlert(alert.id)}
+                  className="text-xs text-[var(--color-brand)] hover:underline"
+                >
                   Acknowledge
                 </button>
               </div>
@@ -359,16 +216,56 @@ export function CustomerHealth() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-5 gap-3">
         <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Avg Health Score</span>
+            <span className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Avg Score</span>
             <Activity size={16} className="text-[var(--text-muted)]" />
           </div>
-          <div className="mt-2 text-2xl font-bold" style={{ color: getHealthColor(stats.avgScore) }}>
-            {stats.avgScore}
+          <div className="mt-2 text-2xl font-bold" style={{ color: getHealthColor(displayStats.avgScore) }}>
+            {displayStats.avgScore}
           </div>
+          <div className="mt-1 text-xs text-[var(--text-muted)]">{getHealthBand(displayStats.avgScore)}</div>
         </div>
+        <button
+          onClick={() => setFilter('excellent')}
+          className={`text-left bg-[var(--bg-secondary)] border rounded-lg p-4 transition-colors ${
+            filter === 'excellent' ? 'border-[var(--color-success)]' : 'border-[var(--border-primary)] hover:border-[var(--color-success)]/50'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Excellent</span>
+            <div className="w-2 h-2 rounded-full bg-[var(--color-success)]" />
+          </div>
+          <div className="mt-2 text-2xl font-bold text-[var(--color-success)]">{displayStats.excellent}</div>
+          <div className="mt-1 text-xs text-[var(--text-muted)]">90+</div>
+        </button>
+        <button
+          onClick={() => setFilter('good')}
+          className={`text-left bg-[var(--bg-secondary)] border rounded-lg p-4 transition-colors ${
+            filter === 'good' ? 'border-[var(--color-warning)]' : 'border-[var(--border-primary)] hover:border-[var(--color-warning)]/50'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Good</span>
+            <div className="w-2 h-2 rounded-full bg-[var(--color-warning)]" />
+          </div>
+          <div className="mt-2 text-2xl font-bold text-[var(--color-warning)]">{displayStats.good}</div>
+          <div className="mt-1 text-xs text-[var(--text-muted)]">70-89</div>
+        </button>
+        <button
+          onClick={() => setFilter('needs_attention')}
+          className={`text-left bg-[var(--bg-secondary)] border rounded-lg p-4 transition-colors ${
+            filter === 'needs_attention' ? 'border-[var(--color-orange)]' : 'border-[var(--border-primary)] hover:border-[var(--color-orange)]/50'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Needs Attn</span>
+            <div className="w-2 h-2 rounded-full bg-[var(--color-orange)]" />
+          </div>
+          <div className="mt-2 text-2xl font-bold text-[var(--color-orange)]">{displayStats.needsAttention}</div>
+          <div className="mt-1 text-xs text-[var(--text-muted)]">50-69</div>
+        </button>
         <button
           onClick={() => setFilter('at_risk')}
           className={`text-left bg-[var(--bg-secondary)] border rounded-lg p-4 transition-colors ${
@@ -379,31 +276,8 @@ export function CustomerHealth() {
             <span className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">At Risk</span>
             <div className="w-2 h-2 rounded-full bg-[var(--color-error)]" />
           </div>
-          <div className="mt-2 text-2xl font-bold text-[var(--color-error)]">{stats.atRisk}</div>
-        </button>
-        <button
-          onClick={() => setFilter('needs_attention')}
-          className={`text-left bg-[var(--bg-secondary)] border rounded-lg p-4 transition-colors ${
-            filter === 'needs_attention' ? 'border-[var(--color-warning)]' : 'border-[var(--border-primary)] hover:border-[var(--color-warning)]/50'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Needs Attention</span>
-            <div className="w-2 h-2 rounded-full bg-[var(--color-warning)]" />
-          </div>
-          <div className="mt-2 text-2xl font-bold text-[var(--color-warning)]">{stats.needsAttention}</div>
-        </button>
-        <button
-          onClick={() => setFilter('healthy')}
-          className={`text-left bg-[var(--bg-secondary)] border rounded-lg p-4 transition-colors ${
-            filter === 'healthy' ? 'border-[var(--color-success)]' : 'border-[var(--border-primary)] hover:border-[var(--color-success)]/50'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Healthy</span>
-            <div className="w-2 h-2 rounded-full bg-[var(--color-success)]" />
-          </div>
-          <div className="mt-2 text-2xl font-bold text-[var(--color-success)]">{stats.healthy}</div>
+          <div className="mt-2 text-2xl font-bold text-[var(--color-error)]">{displayStats.atRisk}</div>
+          <div className="mt-1 text-xs text-[var(--text-muted)]">&lt;50</div>
         </button>
       </div>
 
@@ -412,7 +286,7 @@ export function CustomerHealth() {
         <div className="flex items-center gap-2">
           <Filter size={14} className="text-[var(--text-muted)]" />
           <span className="text-sm text-[var(--text-muted)]">
-            Showing {filteredTenants.length} of {MOCK_TENANTS.length} tenants
+            Showing {filteredTenants.length} of {displayStats.total} tenants
           </span>
         </div>
         {filter !== 'all' && (
@@ -447,9 +321,9 @@ export function CustomerHealth() {
               >
                 <td className="px-4 py-3">
                   <div>
-                    <span className="text-sm font-medium text-[var(--text-primary)]">{tenant.name}</span>
+                    <span className="text-sm font-medium text-[var(--text-primary)]">{tenant.tenantName}</span>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-[var(--text-muted)]">{tenant.subdomain}</span>
+                      <span className="text-xs text-[var(--text-muted)]">{tenant.tenantSubdomain}</span>
                       <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
                         tenant.plan === 'enterprise'
                           ? 'bg-purple-500/20 text-purple-400'
@@ -481,7 +355,7 @@ export function CustomerHealth() {
                 </td>
                 <td className="px-4 py-3">
                   <span className={`text-sm ${tenant.daysSinceLogin > 7 ? 'text-[var(--color-error)]' : 'text-[var(--text-secondary)]'}`}>
-                    {tenant.lastActivity}
+                    {tenant.lastActivityAt ? new Date(tenant.lastActivityAt).toLocaleDateString() : 'Never'}
                   </span>
                 </td>
                 <td className="px-4 py-3">
@@ -515,8 +389,8 @@ export function CustomerHealth() {
             <div className="flex items-start gap-4">
               <HealthScoreRing score={selectedTenant.healthScore} size={80} />
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-[var(--text-primary)]">{selectedTenant.name}</h3>
-                <p className="text-sm text-[var(--text-muted)]">{selectedTenant.subdomain}.barkbase.app</p>
+                <h3 className="text-lg font-semibold text-[var(--text-primary)]">{selectedTenant.tenantName}</h3>
+                <p className="text-sm text-[var(--text-muted)]">{selectedTenant.tenantSubdomain}.barkbase.app</p>
                 <div className="flex items-center gap-3 mt-2">
                   <span
                     className="text-xs font-medium px-2 py-1 rounded"

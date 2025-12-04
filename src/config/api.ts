@@ -152,4 +152,38 @@ export const API_ENDPOINTS = {
   whiteLabelBranding: (tenantId: string) => `/admin/white-label/${tenantId}`,
   whiteLabelHistory: (tenantId: string) => `/admin/white-label/${tenantId}/history`,
   whiteLabelVerifyDomain: (tenantId: string) => `/admin/white-label/${tenantId}/verify-domain`,
+
+  // Customer Health endpoints
+  healthScores: '/admin/health-scores',
+  healthScoresStats: '/admin/health-scores/stats',
+  healthScore: (tenantId: string) => `/admin/health-scores/${tenantId}`,
+  churnAlerts: '/admin/churn-alerts',
+  churnAlertAcknowledge: (id: string) => `/admin/churn-alerts/${id}/acknowledge`,
+
+  // SLA endpoints
+  slaOverview: '/admin/sla/overview',
+  slaComponents: '/admin/sla/components',
+  slaCalendar: '/admin/sla/calendar',
+  slaIncidents: '/admin/sla/incidents',
+  slaCredits: '/admin/sla/credits',
+  slaAlerts: '/admin/sla/alerts',
+
+  // Email Template endpoints
+  emailTemplates: '/admin/email-templates',
+  emailTemplate: (id: string) => `/admin/email-templates/${id}`,
+  emailTemplateVersions: (id: string) => `/admin/email-templates/${id}/versions`,
+  emailTemplateRestore: (id: string, version: number) => `/admin/email-templates/${id}/restore/${version}`,
+  emailTemplateTest: (id: string) => `/admin/email-templates/${id}/test`,
+
+  // Webhook endpoints
+  webhooks: '/admin/webhooks',
+  webhook: (id: string) => `/admin/webhooks/${id}`,
+  webhookTest: (id: string) => `/admin/webhooks/${id}/test`,
+  webhookDeliveries: (id: string) => `/admin/webhooks/${id}/deliveries`,
+
+  // Integration endpoints
+  integrations: '/admin/integrations',
+  integrationConnect: (key: string) => `/admin/integrations/${key}/connect`,
+  integrationDisconnect: (key: string) => `/admin/integrations/${key}`,
+  integrationUsage: '/admin/integrations/usage',
 } as const;

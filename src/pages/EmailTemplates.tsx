@@ -19,146 +19,23 @@ import {
   Check,
 } from 'lucide-react';
 import { SlideOutPanel } from '@/components/ui/SlideOutPanel';
+import {
+  useEmailTemplates,
+  useEmailTemplate,
+  useUpdateEmailTemplate,
+  useEmailTemplateVersions,
+  useRestoreEmailTemplateVersion,
+  useSendTestEmail,
+} from '@/hooks/useApi';
+import type {
+  EmailTemplate,
+  EmailBlock,
+  EmailTemplateVersion,
+  EmailBlockType,
+} from '@/types';
 
-type BlockType = 'header' | 'text' | 'button' | 'image' | 'divider' | 'footer';
 type PreviewMode = 'desktop' | 'mobile';
 
-interface EmailBlock {
-  id: string;
-  type: BlockType;
-  content: string;
-  settings: Record<string, unknown>;
-}
-
-interface EmailTemplate {
-  id: string;
-  key: string;
-  name: string;
-  description: string;
-  subject: string;
-  previewText: string;
-  blocks: EmailBlock[];
-  tenantId: string | null;
-  version: number;
-  isActive: boolean;
-  lastEditedAt: string;
-  lastEditedBy: string;
-}
-
-interface TemplateVersion {
-  id: string;
-  version: number;
-  createdAt: string;
-  createdBy: string;
-}
-
-const DEFAULT_TEMPLATES: EmailTemplate[] = [
-  {
-    id: '1',
-    key: 'booking_confirmation',
-    name: 'Booking Confirmation',
-    description: 'Sent when a booking is confirmed',
-    subject: 'Your booking is confirmed! - {{business_name}}',
-    previewText: 'Your appointment for {{pet_name}} is all set.',
-    blocks: [
-      { id: '1', type: 'header', content: '', settings: { logo: true } },
-      { id: '2', type: 'text', content: 'Hi {{owner_name}},\n\nYour booking has been confirmed!', settings: {} },
-      { id: '3', type: 'text', content: '**Pet:** {{pet_name}}\n**Service:** {{service_name}}\n**Date:** {{booking_date}}\n**Time:** {{booking_time}}', settings: { background: '#f3f4f6' } },
-      { id: '4', type: 'button', content: 'View Booking Details', settings: { url: '{{booking_url}}', color: '#3b82f6' } },
-      { id: '5', type: 'divider', content: '', settings: {} },
-      { id: '6', type: 'footer', content: '{{business_name}} | {{business_address}}', settings: {} },
-    ],
-    tenantId: null,
-    version: 3,
-    isActive: true,
-    lastEditedAt: '2024-01-10T14:30:00Z',
-    lastEditedBy: 'admin@barkbase.com',
-  },
-  {
-    id: '2',
-    key: 'reminder_24h',
-    name: '24-Hour Reminder',
-    description: 'Sent 24 hours before appointment',
-    subject: 'Reminder: {{pet_name}}\'s appointment tomorrow',
-    previewText: 'Don\'t forget about your appointment tomorrow!',
-    blocks: [],
-    tenantId: null,
-    version: 2,
-    isActive: true,
-    lastEditedAt: '2024-01-08T10:00:00Z',
-    lastEditedBy: 'admin@barkbase.com',
-  },
-  {
-    id: '3',
-    key: 'reminder_1h',
-    name: '1-Hour Reminder',
-    description: 'Sent 1 hour before appointment',
-    subject: 'Starting soon: {{pet_name}}\'s appointment',
-    previewText: 'Your appointment starts in 1 hour!',
-    blocks: [],
-    tenantId: null,
-    version: 1,
-    isActive: true,
-    lastEditedAt: '2024-01-05T09:00:00Z',
-    lastEditedBy: 'admin@barkbase.com',
-  },
-  {
-    id: '4',
-    key: 'payment_receipt',
-    name: 'Payment Receipt',
-    description: 'Sent after successful payment',
-    subject: 'Receipt for your payment - {{business_name}}',
-    previewText: 'Thank you for your payment of {{amount}}',
-    blocks: [],
-    tenantId: null,
-    version: 2,
-    isActive: true,
-    lastEditedAt: '2024-01-12T16:45:00Z',
-    lastEditedBy: 'admin@barkbase.com',
-  },
-  {
-    id: '5',
-    key: 'welcome',
-    name: 'Welcome Email',
-    description: 'Sent to new users',
-    subject: 'Welcome to {{business_name}}!',
-    previewText: 'We\'re excited to have you!',
-    blocks: [],
-    tenantId: null,
-    version: 4,
-    isActive: true,
-    lastEditedAt: '2024-01-15T11:20:00Z',
-    lastEditedBy: 'admin@barkbase.com',
-  },
-  {
-    id: '6',
-    key: 'password_reset',
-    name: 'Password Reset',
-    description: 'Sent when user requests password reset',
-    subject: 'Reset your password',
-    previewText: 'Click to reset your password',
-    blocks: [],
-    tenantId: null,
-    version: 1,
-    isActive: true,
-    lastEditedAt: '2024-01-01T00:00:00Z',
-    lastEditedBy: 'admin@barkbase.com',
-  },
-  {
-    id: '7',
-    key: 'vaccination_reminder',
-    name: 'Vaccination Reminder',
-    description: 'Sent when vaccinations are due',
-    subject: '{{pet_name}}\'s vaccination reminder',
-    previewText: 'Time to update vaccinations!',
-    blocks: [],
-    tenantId: null,
-    version: 1,
-    isActive: true,
-    lastEditedAt: '2024-01-03T08:00:00Z',
-    lastEditedBy: 'admin@barkbase.com',
-  },
-];
 
 const AVAILABLE_VARIABLES = [
   { key: '{{owner_name}}', label: 'Owner Name' },
@@ -175,7 +52,7 @@ const AVAILABLE_VARIABLES = [
   { key: '{{unsubscribe_url}}', label: 'Unsubscribe URL' },
 ];
 
-const BLOCK_TYPES: { type: BlockType; label: string; icon: typeof Type }[] = [
+const BLOCK_TYPES: { type: EmailBlockType; label: string; icon: typeof Type }[] = [
   { type: 'header', label: 'Header', icon: Square },
   { type: 'text', label: 'Text', icon: Type },
   { type: 'button', label: 'Button', icon: Square },
@@ -340,8 +217,7 @@ function EmailPreview({
 }
 
 export function EmailTemplates() {
-  const [templates] = useState<EmailTemplate[]>(DEFAULT_TEMPLATES);
-  const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedTemplate, setEditedTemplate] = useState<EmailTemplate | null>(null);
   const [previewMode, setPreviewMode] = useState<PreviewMode>('desktop');
@@ -349,16 +225,27 @@ export function EmailTemplates() {
   const [showHistory, setShowHistory] = useState(false);
   const [showTestEmail, setShowTestEmail] = useState(false);
   const [testEmail, setTestEmail] = useState('');
-  const [isSending, setIsSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
 
+  // API hooks
+  const { data: templatesData, isLoading: isLoadingTemplates } = useEmailTemplates();
+  const { data: selectedTemplateData } = useEmailTemplate(selectedTemplateId || '');
+  const { data: versionsData } = useEmailTemplateVersions(selectedTemplateId || '');
+  const updateTemplate = useUpdateEmailTemplate(selectedTemplateId || '');
+  const restoreVersion = useRestoreEmailTemplateVersion(selectedTemplateId || '');
+  const sendTestEmailMutation = useSendTestEmail(selectedTemplateId || '');
+
+  const templates = templatesData?.templates || [];
+  const selectedTemplate = selectedTemplateData?.template || null;
+  const versions = versionsData?.versions || [];
+
   const handleEdit = (template: EmailTemplate) => {
-    setSelectedTemplate(template);
+    setSelectedTemplateId(template.id);
     setEditedTemplate({ ...template });
     setIsEditing(true);
   };
 
-  const handleAddBlock = (type: BlockType) => {
+  const handleAddBlock = (type: EmailBlockType) => {
     if (!editedTemplate) return;
     const newBlock: EmailBlock = {
       id: crypto.randomUUID(),
@@ -388,11 +275,37 @@ export function EmailTemplates() {
   };
 
   const handleSendTest = async () => {
-    setIsSending(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsSending(false);
-    setSendSuccess(true);
-    setTimeout(() => setSendSuccess(false), 3000);
+    if (!testEmail) return;
+    try {
+      await sendTestEmailMutation.mutateAsync(testEmail);
+      setSendSuccess(true);
+      setTimeout(() => setSendSuccess(false), 3000);
+    } catch (error) {
+      console.error('Failed to send test email:', error);
+    }
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!editedTemplate || !selectedTemplateId) return;
+    try {
+      await updateTemplate.mutateAsync({
+        subject: editedTemplate.subject,
+        previewText: editedTemplate.previewText,
+        blocks: editedTemplate.blocks,
+      });
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Failed to save template:', error);
+    }
+  };
+
+  const handleRestoreVersion = async (version: number) => {
+    try {
+      await restoreVersion.mutateAsync(version);
+      setShowHistory(false);
+    } catch (error) {
+      console.error('Failed to restore version:', error);
+    }
   };
 
   const insertVariable = (variable: string) => {
@@ -400,11 +313,13 @@ export function EmailTemplates() {
     navigator.clipboard.writeText(variable);
   };
 
-  const mockVersions: TemplateVersion[] = [
-    { id: '1', version: 3, createdAt: '2024-01-10T14:30:00Z', createdBy: 'admin@barkbase.com' },
-    { id: '2', version: 2, createdAt: '2024-01-05T10:00:00Z', createdBy: 'admin@barkbase.com' },
-    { id: '3', version: 1, createdAt: '2024-01-01T00:00:00Z', createdBy: 'system' },
-  ];
+  if (isLoadingTemplates) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--color-brand)]" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -678,7 +593,7 @@ export function EmailTemplates() {
         width="md"
       >
         <div className="space-y-2">
-          {mockVersions.map((version, idx) => (
+          {versions.map((version: EmailTemplateVersion, idx: number) => (
             <div
               key={version.id}
               className={`flex items-center justify-between p-3 rounded-lg ${
@@ -699,7 +614,10 @@ export function EmailTemplates() {
                 </p>
               </div>
               {idx > 0 && (
-                <button className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-[var(--color-brand)] hover:bg-[var(--hover-overlay)]">
+                <button 
+                  onClick={() => handleRestoreVersion(version.version)}
+                  className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-[var(--color-brand)] hover:bg-[var(--hover-overlay)]"
+                >
                   <RotateCcw size={12} />
                   Restore
                 </button>

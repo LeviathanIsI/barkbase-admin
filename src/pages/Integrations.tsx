@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   Loader2,
   Plus,
-  Webhook,
+  Webhook as WebhookIcon,
   Plug,
   Trash2,
   Edit2,
@@ -17,53 +17,28 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { SlideOutPanel } from '@/components/ui/SlideOutPanel';
+import {
+  useWebhooks,
+  useCreateWebhook,
+  useUpdateWebhook,
+  useDeleteWebhook,
+  useTestWebhook,
+  useWebhookDeliveries,
+  useIntegrations,
+  useConnectIntegration,
+  useDisconnectIntegration,
+} from '@/hooks/useApi';
+import type {
+  Webhook,
+  WebhookEvent,
+  WebhookDelivery,
+  Integration,
+  CreateWebhookInput,
+  UpdateWebhookInput,
+} from '@/types';
 
-type WebhookEvent =
-  | 'booking.created'
-  | 'booking.updated'
-  | 'booking.cancelled'
-  | 'payment.received'
-  | 'payment.failed'
-  | 'user.signup'
-  | 'user.updated'
-  | 'pet.created'
-  | 'tenant.created';
-
-interface Webhook {
-  id: string;
-  name: string;
-  url: string;
-  secret: string;
-  events: WebhookEvent[];
-  headers: Record<string, string>;
-  tenantId: string | null;
-  isActive: boolean;
-  createdAt: string;
-  lastDelivery?: {
-    status: number;
-    timestamp: string;
-  };
-}
-
-interface WebhookDelivery {
-  id: string;
-  webhookId: string;
-  eventType: WebhookEvent;
-  payload: object;
-  responseStatus: number;
-  responseBody: string;
-  attempts: number;
-  deliveredAt: string;
-  createdAt: string;
-}
-
-interface Integration {
-  id: string;
-  name: string;
-  description: string;
+interface IntegrationDisplay extends Integration {
   logo: string;
-  category: 'communication' | 'automation' | 'finance' | 'calendar' | 'marketing';
-  connected: boolean;
   configFields?: { key: string; label: string; type: string; required: boolean }[];
 }
 
@@ -79,127 +54,46 @@ const WEBHOOK_EVENTS: { event: WebhookEvent; label: string; description: string 
   { event: 'tenant.created', label: 'Tenant Created', description: 'When a new tenant signs up' },
 ];
 
-const INTEGRATIONS: Integration[] = [
-  {
-    id: 'slack',
-    name: 'Slack',
-    description: 'Send notifications to Slack channels',
+// Display-specific data for integrations (logos and config fields)
+const INTEGRATION_UI_DATA: Record<string, { logo: string; configFields?: { key: string; label: string; type: string; required: boolean }[] }> = {
+  slack: {
     logo: '💬',
-    category: 'communication',
-    connected: true,
     configFields: [
       { key: 'webhook_url', label: 'Webhook URL', type: 'url', required: true },
       { key: 'channel', label: 'Default Channel', type: 'text', required: false },
     ],
   },
-  {
-    id: 'zapier',
-    name: 'Zapier',
-    description: 'Connect to 5000+ apps via Zapier',
+  zapier: {
     logo: '⚡',
-    category: 'automation',
-    connected: false,
     configFields: [
       { key: 'webhook_url', label: 'Zapier Webhook URL', type: 'url', required: true },
     ],
   },
-  {
-    id: 'quickbooks',
-    name: 'QuickBooks',
-    description: 'Sync invoices and payments',
+  quickbooks: {
     logo: '📊',
-    category: 'finance',
-    connected: false,
     configFields: [
       { key: 'company_id', label: 'Company ID', type: 'text', required: true },
     ],
   },
-  {
-    id: 'mailchimp',
-    name: 'Mailchimp',
-    description: 'Sync customer emails for marketing',
+  mailchimp: {
     logo: '📧',
-    category: 'marketing',
-    connected: true,
     configFields: [
       { key: 'api_key', label: 'API Key', type: 'password', required: true },
       { key: 'list_id', label: 'Audience List ID', type: 'text', required: true },
     ],
   },
-  {
-    id: 'twilio',
-    name: 'Twilio',
-    description: 'SMS notifications for bookings',
+  twilio: {
     logo: '📱',
-    category: 'communication',
-    connected: false,
     configFields: [
       { key: 'account_sid', label: 'Account SID', type: 'text', required: true },
       { key: 'auth_token', label: 'Auth Token', type: 'password', required: true },
       { key: 'from_number', label: 'From Number', type: 'text', required: true },
     ],
   },
-  {
-    id: 'google-calendar',
-    name: 'Google Calendar',
-    description: 'Sync bookings to Google Calendar',
+  'google-calendar': {
     logo: '📅',
-    category: 'calendar',
-    connected: false,
   },
-];
-
-const MOCK_WEBHOOKS: Webhook[] = [
-  {
-    id: '1',
-    name: 'Production Notifications',
-    url: 'https://api.example.com/webhooks/barkbase',
-    secret: 'whsec_abc123',
-    events: ['booking.created', 'booking.cancelled', 'payment.received'],
-    headers: { 'X-Custom-Header': 'value' },
-    tenantId: null,
-    isActive: true,
-    createdAt: '2024-01-01T00:00:00Z',
-    lastDelivery: { status: 200, timestamp: '2024-01-15T10:30:00Z' },
-  },
-  {
-    id: '2',
-    name: 'Happy Paws Integration',
-    url: 'https://happypaws.com/api/barkbase-webhook',
-    secret: 'whsec_xyz789',
-    events: ['booking.created', 'user.signup'],
-    headers: {},
-    tenantId: 'tenant_123',
-    isActive: true,
-    createdAt: '2024-01-10T00:00:00Z',
-    lastDelivery: { status: 500, timestamp: '2024-01-14T15:00:00Z' },
-  },
-];
-
-const MOCK_DELIVERIES: WebhookDelivery[] = [
-  {
-    id: '1',
-    webhookId: '1',
-    eventType: 'booking.created',
-    payload: { booking_id: 'book_123', pet_name: 'Max', service: 'Grooming' },
-    responseStatus: 200,
-    responseBody: '{"success": true}',
-    attempts: 1,
-    deliveredAt: '2024-01-15T10:30:00Z',
-    createdAt: '2024-01-15T10:30:00Z',
-  },
-  {
-    id: '2',
-    webhookId: '2',
-    eventType: 'user.signup',
-    payload: { user_id: 'user_456', email: 'john@example.com' },
-    responseStatus: 500,
-    responseBody: 'Internal Server Error',
-    attempts: 3,
-    deliveredAt: '2024-01-14T15:00:00Z',
-    createdAt: '2024-01-14T14:55:00Z',
-  },
-];
+};
 
 function getStatusColor(status: number): string {
   if (status >= 200 && status < 300) return 'var(--color-success)';
@@ -209,11 +103,28 @@ function getStatusColor(status: number): string {
 
 export function Integrations() {
   const [activeTab, setActiveTab] = useState<'webhooks' | 'integrations' | 'usage'>('webhooks');
-  const [webhooks] = useState<Webhook[]>(MOCK_WEBHOOKS);
-  const [selectedWebhook, setSelectedWebhook] = useState<Webhook | null>(null);
+  const [selectedWebhookId, setSelectedWebhookId] = useState<string | null>(null);
   const [showCreateWebhook, setShowCreateWebhook] = useState(false);
-  const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
+  const [selectedIntegration, setSelectedIntegration] = useState<IntegrationDisplay | null>(null);
   const [expandedDeliveries, setExpandedDeliveries] = useState<Record<string, boolean>>({});
+
+  // API hooks
+  const { data: webhooksData, isLoading: isLoadingWebhooks } = useWebhooks();
+  const { data: integrationsData, isLoading: isLoadingIntegrations } = useIntegrations();
+  const { data: deliveriesData } = useWebhookDeliveries(selectedWebhookId || '');
+  const createWebhook = useCreateWebhook();
+  const updateWebhookMutation = useUpdateWebhook(selectedWebhookId || '');
+  const deleteWebhookMutation = useDeleteWebhook();
+  const testWebhookMutation = useTestWebhook(selectedWebhookId || '');
+  const connectIntegration = useConnectIntegration();
+  const disconnectIntegration = useDisconnectIntegration();
+
+  const webhooks = webhooksData?.webhooks || [];
+  const integrations = integrationsData?.integrations || [];
+  const deliveries = deliveriesData?.deliveries || [];
+  const selectedWebhook = webhooks.find((w: Webhook) => w.id === selectedWebhookId) || null;
+
+  const isLoading = isLoadingWebhooks || isLoadingIntegrations;
 
   // Form state
   const [webhookForm, setWebhookForm] = useState({
@@ -226,7 +137,6 @@ export function Integrations() {
     isActive: true,
   });
 
-  const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const handleCreateWebhook = () => {
@@ -243,19 +153,72 @@ export function Integrations() {
     setShowCreateWebhook(true);
   };
 
-  const handleTestWebhook = async () => {
-    setIsTesting(true);
-    setTestResult(null);
-
-    // Simulate test
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    setIsTesting(false);
-    setTestResult({
-      success: Math.random() > 0.3,
-      message: Math.random() > 0.3 ? 'Webhook received successfully' : 'Connection refused',
-    });
+  const handleSaveWebhook = async () => {
+    try {
+      const webhookData: CreateWebhookInput = {
+        name: webhookForm.name,
+        url: webhookForm.url,
+        events: webhookForm.events,
+        headers: webhookForm.headers,
+        tenantId: webhookForm.tenantId || undefined,
+      };
+      await createWebhook.mutateAsync(webhookData);
+      setShowCreateWebhook(false);
+    } catch (error) {
+      console.error('Failed to create webhook:', error);
+    }
   };
+
+  const handleUpdateWebhook = async (data: UpdateWebhookInput) => {
+    try {
+      await updateWebhookMutation.mutateAsync(data);
+    } catch (error) {
+      console.error('Failed to update webhook:', error);
+    }
+  };
+
+  const handleDeleteWebhook = async (id: string) => {
+    try {
+      await deleteWebhookMutation.mutateAsync(id);
+      setSelectedWebhookId(null);
+    } catch (error) {
+      console.error('Failed to delete webhook:', error);
+    }
+  };
+
+  const handleTestWebhook = async () => {
+    try {
+      setTestResult(null);
+      const result = await testWebhookMutation.mutateAsync();
+      setTestResult({ success: result.success, message: result.message });
+    } catch (error) {
+      setTestResult({ success: false, message: 'Test failed' });
+    }
+  };
+
+  const handleConnectIntegration = async (key: string, config: Record<string, string>) => {
+    try {
+      await connectIntegration.mutateAsync({ key, config });
+    } catch (error) {
+      console.error('Failed to connect integration:', error);
+    }
+  };
+
+  const handleDisconnectIntegration = async (key: string) => {
+    try {
+      await disconnectIntegration.mutateAsync(key);
+    } catch (error) {
+      console.error('Failed to disconnect integration:', error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--color-brand)]" />
+      </div>
+    );
+  }
 
   const toggleEvent = (event: WebhookEvent) => {
     setWebhookForm(prev => ({
@@ -266,8 +229,14 @@ export function Integrations() {
     }));
   };
 
-  const connectedIntegrations = INTEGRATIONS.filter(i => i.connected);
-  const availableIntegrations = INTEGRATIONS.filter(i => !i.connected);
+  // Merge API data with UI-specific display data
+  const integrationsWithUI = integrations.map((i: Integration) => ({
+    ...i,
+    logo: INTEGRATION_UI_DATA[i.integrationKey]?.logo || '🔌',
+    configFields: INTEGRATION_UI_DATA[i.integrationKey]?.configFields,
+  }));
+  const connectedIntegrations = integrationsWithUI.filter((i: IntegrationDisplay) => i.isConnected);
+  const availableIntegrations = integrationsWithUI.filter((i: IntegrationDisplay) => !i.isConnected);
 
   return (
     <div className="space-y-6">
@@ -291,7 +260,7 @@ export function Integrations() {
                 : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
             }`}
           >
-            {tab === 'webhooks' && <Webhook size={14} className="inline mr-1.5" />}
+            {tab === 'webhooks' && <WebhookIcon size={14} className="inline mr-1.5" />}
             {tab === 'integrations' && <Plug size={14} className="inline mr-1.5" />}
             {tab === 'usage' && <BarChart3 size={14} className="inline mr-1.5" />}
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -345,21 +314,24 @@ export function Integrations() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {webhook.lastDelivery && (
+                    {webhook.lastDeliveryStatus && (
                       <div className="text-right mr-4">
                         <p className="text-xs text-[var(--text-muted)]">Last delivery</p>
-                        <p className="text-xs font-medium" style={{ color: getStatusColor(webhook.lastDelivery.status) }}>
-                          {webhook.lastDelivery.status}
+                        <p className="text-xs font-medium" style={{ color: getStatusColor(webhook.lastDeliveryStatus) }}>
+                          {webhook.lastDeliveryStatus}
                         </p>
                       </div>
                     )}
                     <button
-                      onClick={() => setSelectedWebhook(webhook)}
+                      onClick={() => setSelectedWebhookId(webhook.id)}
                       className="p-2 rounded hover:bg-[var(--hover-overlay)] text-[var(--text-muted)]"
                     >
                       <Edit2 size={14} />
                     </button>
-                    <button className="p-2 rounded hover:bg-[var(--color-error-soft)] text-[var(--text-muted)] hover:text-[var(--color-error)]">
+                    <button 
+                      onClick={() => handleDeleteWebhook(webhook.id)}
+                      className="p-2 rounded hover:bg-[var(--color-error-soft)] text-[var(--text-muted)] hover:text-[var(--color-error)]"
+                    >
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -376,7 +348,7 @@ export function Integrations() {
                   </button>
                   {expandedDeliveries[webhook.id] && (
                     <div className="mt-2 space-y-1">
-                      {MOCK_DELIVERIES.filter(d => d.webhookId === webhook.id).map(delivery => (
+                      {deliveries.filter((d: WebhookDelivery) => d.webhookId === webhook.id).map((delivery: WebhookDelivery) => (
                         <div
                           key={delivery.id}
                           className="flex items-center justify-between p-2 bg-[var(--bg-tertiary)] rounded text-xs"
@@ -573,7 +545,7 @@ export function Integrations() {
         isOpen={showCreateWebhook || !!selectedWebhook}
         onClose={() => {
           setShowCreateWebhook(false);
-          setSelectedWebhook(null);
+          setSelectedWebhookId(null);
           setTestResult(null);
         }}
         title={selectedWebhook ? 'Edit Webhook' : 'Create Webhook'}
@@ -581,24 +553,25 @@ export function Integrations() {
         footer={
           <div className="flex items-center justify-between">
             <button
-              onClick={handleTestWebhook}
-              disabled={!webhookForm.url || isTesting}
+              onClick={() => selectedWebhookId && handleTestWebhook()}
+              disabled={!webhookForm.url || testWebhookMutation.isPending}
               className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--hover-overlay)] disabled:opacity-50"
             >
-              {isTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play size={14} />}
+              {testWebhookMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play size={14} />}
               Test Webhook
             </button>
             <div className="flex gap-2">
               <button
                 onClick={() => {
                   setShowCreateWebhook(false);
-                  setSelectedWebhook(null);
+                  setSelectedWebhookId(null);
                 }}
                 className="px-4 py-2 rounded-md text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--hover-overlay)]"
               >
                 Cancel
               </button>
               <button
+                onClick={selectedWebhook ? () => handleUpdateWebhook(webhookForm) : handleSaveWebhook}
                 disabled={!webhookForm.name || !webhookForm.url || webhookForm.events.length === 0}
                 className="px-4 py-2 rounded-md text-sm font-medium bg-[var(--color-brand)] text-white hover:bg-[var(--color-brand-hover)] disabled:opacity-50"
               >
@@ -721,12 +694,15 @@ export function Integrations() {
       <SlideOutPanel
         isOpen={!!selectedIntegration}
         onClose={() => setSelectedIntegration(null)}
-        title={`${selectedIntegration?.connected ? 'Configure' : 'Connect'} ${selectedIntegration?.name}`}
+        title={`${selectedIntegration?.isConnected ? 'Configure' : 'Connect'} ${selectedIntegration?.name}`}
         width="md"
         footer={
           <div className="flex justify-end gap-2">
-            {selectedIntegration?.connected && (
-              <button className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium text-[var(--color-error)] hover:bg-[var(--color-error-soft)]">
+            {selectedIntegration?.isConnected && (
+              <button 
+                onClick={() => selectedIntegration && handleDisconnectIntegration(selectedIntegration.integrationKey)}
+                className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium text-[var(--color-error)] hover:bg-[var(--color-error-soft)]"
+              >
                 <X size={14} />
                 Disconnect
               </button>
@@ -737,8 +713,11 @@ export function Integrations() {
             >
               Cancel
             </button>
-            <button className="px-4 py-2 rounded-md text-sm font-medium bg-[var(--color-brand)] text-white hover:bg-[var(--color-brand-hover)]">
-              {selectedIntegration?.connected ? 'Save' : 'Connect'}
+            <button 
+              onClick={() => selectedIntegration && handleConnectIntegration(selectedIntegration.integrationKey, {})}
+              className="px-4 py-2 rounded-md text-sm font-medium bg-[var(--color-brand)] text-white hover:bg-[var(--color-brand-hover)]"
+            >
+              {selectedIntegration?.isConnected ? 'Save' : 'Connect'}
             </button>
           </div>
         }

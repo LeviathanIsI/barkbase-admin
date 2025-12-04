@@ -69,9 +69,28 @@ export function TenantDetail({ tenant, onClose, onRefresh }: TenantDetailProps) 
         return 'bg-[var(--color-error-soft)] text-[var(--color-error)]';
       case 'trial':
         return 'bg-[var(--color-warning-soft)] text-[var(--color-warning)]';
+      case 'churned':
+        return 'bg-[var(--color-error-soft)] text-[var(--color-error)]';
       default:
         return 'bg-[var(--bg-tertiary)] text-[var(--text-muted)]';
     }
+  };
+
+  const getActivityColor = (days: number | undefined) => {
+    if (days === undefined) return 'text-[var(--text-muted)]';
+    if (days <= 7) return 'text-[var(--color-success)]';      // Active within a week
+    if (days <= 30) return 'text-[var(--color-warning)]';     // Somewhat active
+    return 'text-[var(--color-error)]';                        // Inactive 30+ days
+  };
+
+  const getActivityLabel = (lastActivityAt: string | undefined, daysSince: number | undefined) => {
+    if (!lastActivityAt) return 'Never logged in';
+    if (daysSince === 0) return 'Active today';
+    if (daysSince === 1) return 'Active yesterday';
+    if (daysSince !== undefined && daysSince <= 7) return `Active ${daysSince} days ago`;
+    if (daysSince !== undefined && daysSince <= 30) return `Last active ${daysSince} days ago`;
+    if (daysSince !== undefined) return `Inactive ${daysSince} ${daysSince === 1 ? 'day' : 'days'}`;
+    return 'Unknown';
   };
 
   const tabs: { id: TabType; label: string }[] = [
@@ -94,9 +113,15 @@ export function TenantDetail({ tenant, onClose, onRefresh }: TenantDetailProps) 
               <h2 className="text-base font-semibold text-[var(--text-primary)]">
                 {tenant.name}
               </h2>
-              <span className={`inline-flex text-[10px] font-medium px-1.5 py-0.5 rounded ${getStatusColor(tenant.status)}`}>
-                {tenant.status.toUpperCase()}
-              </span>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className={`inline-flex text-[10px] font-medium px-1.5 py-0.5 rounded ${getStatusColor(tenant.status)}`}>
+                  {tenant.status.toUpperCase()}
+                </span>
+                <span className="text-[10px] text-[var(--text-muted)]">·</span>
+                <span className={`text-[10px] ${getActivityColor(tenant.daysSinceActivity)}`}>
+                  {getActivityLabel(tenant.lastActivityAt, tenant.daysSinceActivity)}
+                </span>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -161,7 +186,18 @@ export function TenantDetail({ tenant, onClose, onRefresh }: TenantDetailProps) 
               <InfoRow label="Subdomain" value={tenant.subdomain || '-'} />
               <InfoRow label="Created" value={tenant.createdAt ? format(new Date(tenant.createdAt), 'MMM d, yyyy') : '-'} />
               <InfoRow label="Plan" value={tenant.plan || 'Free'} />
-              <InfoRow label="Status" value={tenant.status} />
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-[var(--text-muted)]">Subscription</span>
+                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${getStatusColor(tenant.status)}`}>
+                  {tenant.status.toUpperCase()}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-[var(--text-muted)]">Last Activity</span>
+                <span className={`text-sm ${getActivityColor(tenant.daysSinceActivity)}`}>
+                  {getActivityLabel(tenant.lastActivityAt, tenant.daysSinceActivity)}
+                </span>
+              </div>
             </div>
           </div>
         )}

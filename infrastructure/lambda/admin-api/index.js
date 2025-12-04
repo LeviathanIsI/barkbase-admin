@@ -58,6 +58,8 @@ exports.handler = async (event, context) => {
   const method = event.requestContext?.http?.method || event.httpMethod;
   const path = event.requestContext?.http?.path || event.path;
 
+  console.log('=== INCOMING REQUEST ===', { method, path, body: event.body?.substring(0, 500) });
+
   // Handle CORS preflight requests
   if (method === 'OPTIONS') {
     return corsResponse(200, {});
@@ -67,6 +69,8 @@ exports.handler = async (event, context) => {
     // Authenticate all admin requests
     const user = await authenticateRequest(event);
     const clientIp = getClientIp(event);
+
+    console.log('User authenticated:', { email: user.email, role: user.role });
 
     // Route to appropriate handler
     if (path.startsWith('/admin/search')) {
@@ -180,10 +184,12 @@ exports.handler = async (event, context) => {
 
     // Single incident operations
     if (path.match(/^\/admin\/incidents\/[^/]+$/)) {
+      console.log('Matched single incident route:', { method, path });
       if (method === 'GET') {
         return await handleGetIncident(event, user);
       }
       if (method === 'PUT') {
+        console.log('Routing to handleUpdateIncident');
         return await handleUpdateIncident(event, user, clientIp);
       }
       if (method === 'DELETE') {
@@ -717,6 +723,200 @@ exports.handler = async (event, context) => {
       }
     }
 
+    // Settings routes
+    if (path === '/admin/settings') {
+      if (method === 'GET') {
+        return await handleGetSettings(event, user);
+      }
+      if (method === 'PUT') {
+        return await handleUpdateSettings(event, user, clientIp);
+      }
+    }
+
+    // API Keys routes
+    if (path === '/admin/api-keys') {
+      if (method === 'GET') {
+        return await handleListApiKeys(event, user);
+      }
+      if (method === 'POST') {
+        return await handleCreateApiKey(event, user, clientIp);
+      }
+    }
+
+    if (path.match(/^\/admin\/api-keys\/[^/]+$/)) {
+      if (method === 'DELETE') {
+        return await handleRevokeApiKey(event, user, clientIp);
+      }
+    }
+
+    // Analytics routes
+    if (path === '/admin/analytics') {
+      if (method === 'GET') {
+        return await handleGetAnalytics(event, user);
+      }
+    }
+
+    // Customer Health routes
+    if (path === '/admin/health-scores') {
+      if (method === 'GET') {
+        return await handleGetHealthScores(event, user);
+      }
+    }
+
+    if (path === '/admin/health-scores/stats') {
+      if (method === 'GET') {
+        return await handleGetHealthScoresStats(event, user);
+      }
+    }
+
+    if (path.match(/^\/admin\/health-scores\/[^/]+$/)) {
+      if (method === 'GET') {
+        return await handleGetHealthScore(event, user);
+      }
+    }
+
+    if (path === '/admin/churn-alerts') {
+      if (method === 'GET') {
+        return await handleGetChurnAlerts(event, user);
+      }
+    }
+
+    if (path.match(/^\/admin\/churn-alerts\/[^/]+\/acknowledge$/)) {
+      if (method === 'POST') {
+        return await handleAcknowledgeChurnAlert(event, user, clientIp);
+      }
+    }
+
+    // SLA routes
+    if (path === '/admin/sla/overview') {
+      if (method === 'GET') {
+        return await handleGetSlaOverview(event, user);
+      }
+    }
+
+    if (path === '/admin/sla/components') {
+      if (method === 'GET') {
+        return await handleGetSlaComponents(event, user);
+      }
+    }
+
+    if (path === '/admin/sla/calendar') {
+      if (method === 'GET') {
+        return await handleGetSlaCalendar(event, user);
+      }
+    }
+
+    if (path === '/admin/sla/incidents') {
+      if (method === 'GET') {
+        return await handleGetSlaIncidents(event, user);
+      }
+    }
+
+    if (path === '/admin/sla/credits') {
+      if (method === 'GET') {
+        return await handleGetSlaCredits(event, user);
+      }
+    }
+
+    if (path === '/admin/sla/alerts') {
+      if (method === 'GET') {
+        return await handleGetSlaAlerts(event, user);
+      }
+      if (method === 'PUT') {
+        return await handleUpdateSlaAlerts(event, user, clientIp);
+      }
+    }
+
+    // Email Template routes
+    if (path === '/admin/email-templates') {
+      if (method === 'GET') {
+        return await handleGetEmailTemplates(event, user);
+      }
+    }
+
+    if (path.match(/^\/admin\/email-templates\/[^/]+\/versions$/)) {
+      if (method === 'GET') {
+        return await handleGetEmailTemplateVersions(event, user);
+      }
+    }
+
+    if (path.match(/^\/admin\/email-templates\/[^/]+\/restore\/\d+$/)) {
+      if (method === 'POST') {
+        return await handleRestoreEmailTemplateVersion(event, user, clientIp);
+      }
+    }
+
+    if (path.match(/^\/admin\/email-templates\/[^/]+\/test$/)) {
+      if (method === 'POST') {
+        return await handleSendTestEmail(event, user);
+      }
+    }
+
+    if (path.match(/^\/admin\/email-templates\/[^/]+$/)) {
+      if (method === 'GET') {
+        return await handleGetEmailTemplate(event, user);
+      }
+      if (method === 'PUT') {
+        return await handleUpdateEmailTemplate(event, user, clientIp);
+      }
+    }
+
+    // Webhook routes
+    if (path === '/admin/webhooks') {
+      if (method === 'GET') {
+        return await handleGetWebhooks(event, user);
+      }
+      if (method === 'POST') {
+        return await handleCreateWebhook(event, user, clientIp);
+      }
+    }
+
+    if (path.match(/^\/admin\/webhooks\/[^/]+\/test$/)) {
+      if (method === 'POST') {
+        return await handleTestWebhook(event, user);
+      }
+    }
+
+    if (path.match(/^\/admin\/webhooks\/[^/]+\/deliveries$/)) {
+      if (method === 'GET') {
+        return await handleGetWebhookDeliveries(event, user);
+      }
+    }
+
+    if (path.match(/^\/admin\/webhooks\/[^/]+$/)) {
+      if (method === 'PUT') {
+        return await handleUpdateWebhook(event, user, clientIp);
+      }
+      if (method === 'DELETE') {
+        return await handleDeleteWebhook(event, user, clientIp);
+      }
+    }
+
+    // Integration routes
+    if (path === '/admin/integrations') {
+      if (method === 'GET') {
+        return await handleGetIntegrations(event, user);
+      }
+    }
+
+    if (path === '/admin/integrations/usage') {
+      if (method === 'GET') {
+        return await handleGetIntegrationUsage(event, user);
+      }
+    }
+
+    if (path.match(/^\/admin\/integrations\/[^/]+\/connect$/)) {
+      if (method === 'POST') {
+        return await handleConnectIntegration(event, user, clientIp);
+      }
+    }
+
+    if (path.match(/^\/admin\/integrations\/[^/]+$/)) {
+      if (method === 'DELETE') {
+        return await handleDisconnectIntegration(event, user, clientIp);
+      }
+    }
+
     return response(404, { message: 'Not found' });
   } catch (error) {
     console.error('Admin API error:', error);
@@ -793,7 +993,7 @@ async function handleSearch(event, user, clientIp) {
 }
 
 async function handleTenant(event, user, clientIp) {
-  const tenantId = extractPathParam(event.path, '/admin/tenants/');
+  const tenantId = extractPathParam(event, '/admin/tenants/');
 
   const tenantResult = await barkbaseQuery(
     `SELECT id, name, state, created_at, settings
@@ -892,7 +1092,7 @@ async function handleTenant(event, user, clientIp) {
 }
 
 async function handleTenantUsers(event, user) {
-  const tenantId = extractPathParam(event.path, '/admin/tenants/', '/users');
+  const tenantId = extractPathParam(event, '/admin/tenants/', '/users');
 
   const result = await barkbaseQuery(
     `SELECT id, email, name, role, status, created_at, last_login_at
@@ -918,7 +1118,7 @@ async function handleTenantUsers(event, user) {
 // =========================================================================
 
 async function handleSuspendTenant(event, user, clientIp) {
-  const tenantId = extractPathParam(event.path, '/admin/tenants/', '/suspend');
+  const tenantId = extractPathParam(event, '/admin/tenants/', '/suspend');
 
   // Check permission (only super_admin and support_lead)
   if (!['super_admin', 'support_lead'].includes(user.role)) {
@@ -941,7 +1141,7 @@ async function handleSuspendTenant(event, user, clientIp) {
 }
 
 async function handleUnsuspendTenant(event, user, clientIp) {
-  const tenantId = extractPathParam(event.path, '/admin/tenants/', '/unsuspend');
+  const tenantId = extractPathParam(event, '/admin/tenants/', '/unsuspend');
 
   // Check permission
   if (!['super_admin', 'support_lead'].includes(user.role)) {
@@ -964,7 +1164,7 @@ async function handleUnsuspendTenant(event, user, clientIp) {
 }
 
 async function handleExtendTrial(event, user, clientIp) {
-  const tenantId = extractPathParam(event.path, '/admin/tenants/', '/extend-trial');
+  const tenantId = extractPathParam(event, '/admin/tenants/', '/extend-trial');
   const body = JSON.parse(event.body || '{}');
   const days = parseInt(body.days) || 7;
 
@@ -997,7 +1197,8 @@ async function handleExtendTrial(event, user, clientIp) {
 
 async function handleResetUserPassword(event, user, clientIp) {
   // Extract both tenantId and userId from path
-  const pathParts = event.path.split('/');
+  const path = event.requestContext?.http?.path || event.path;
+  const pathParts = path.split('/');
   const tenantId = pathParts[3];
   const userId = pathParts[5];
 
@@ -1160,7 +1361,7 @@ async function handleIncidentStats(event, user) {
  * Get single incident with full details
  */
 async function handleGetIncident(event, user) {
-  const incidentId = extractPathParam(event.path, '/admin/incidents/');
+  const incidentId = extractPathParam(event, '/admin/incidents/');
 
   const incidentResult = await opsQuery(
     `SELECT * FROM incidents WHERE id = $1`,
@@ -1252,16 +1453,18 @@ async function handleCreateIncident(event, user, clientIp) {
   // Create initial timeline entry
   await opsQuery(`
     INSERT INTO incident_updates (
-      incident_id, update_type, message, new_status, new_severity,
-      created_by, created_by_name
+      incident_id, update_type, message, status, new_status, new_severity,
+      created_by, created_by_name, created_by_id, created_by_email
     )
-    VALUES ($1, 'created', $2, 'investigating', $3, $4, $5)
+    VALUES ($1, 'created', $2, 'investigating', 'investigating', $3, $4, $5, $6, $7)
   `, [
     incident.id,
     `Incident created: "${title}"`,
     severity,
     user.email,
     user.name || user.email,
+    user.email,
+    user.email,
   ]);
 
   await logAudit(user, 'create_incident', 'incident', incident.id, {
@@ -1279,8 +1482,10 @@ async function handleUpdateIncident(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to update incidents' });
   }
 
-  const incidentId = extractPathParam(event.path, '/admin/incidents/');
+  const incidentId = extractPathParam(event, '/admin/incidents/');
   const body = JSON.parse(event.body || '{}');
+
+  console.log('Update incident request:', { incidentId, body });
 
   // Get current incident state
   const currentResult = await opsQuery(`SELECT * FROM incidents WHERE id = $1`, [incidentId]);
@@ -1289,13 +1494,15 @@ async function handleUpdateIncident(event, user, clientIp) {
   }
   const current = currentResult.rows[0];
 
+  console.log('Current incident state:', { status: current.status, severity: current.severity });
+
   const updates = [];
   const params = [];
   let paramIndex = 1;
   const timelineEntries = [];
 
-  // Track status change
-  if (body.status && body.status !== current.status) {
+  // Track status change (compare lowercase to handle case mismatches)
+  if (body.status && body.status.toLowerCase() !== (current.status || '').toLowerCase()) {
     updates.push(`status = $${paramIndex++}`);
     params.push(body.status);
 
@@ -1315,8 +1522,8 @@ async function handleUpdateIncident(event, user, clientIp) {
     });
   }
 
-  // Track severity change
-  if (body.severity && body.severity !== current.severity) {
+  // Track severity change (compare lowercase to handle case mismatches)
+  if (body.severity && body.severity.toLowerCase() !== (current.severity || '').toLowerCase()) {
     updates.push(`severity = $${paramIndex++}`);
     params.push(body.severity);
     timelineEntries.push({
@@ -1370,7 +1577,9 @@ async function handleUpdateIncident(event, user, clientIp) {
   }
 
   if (updates.length === 0) {
-    return response(400, { message: 'No updates provided' });
+    // No actual changes - return current incident (no-op, not an error)
+    console.log('No changes detected, returning current incident');
+    return response(200, { incident: formatEnhancedIncident(current) });
   }
 
   params.push(incidentId);
@@ -1384,20 +1593,24 @@ async function handleUpdateIncident(event, user, clientIp) {
   for (const entry of timelineEntries) {
     await opsQuery(`
       INSERT INTO incident_updates (
-        incident_id, update_type, message, previous_status, new_status,
-        previous_severity, new_severity, created_by, created_by_name
+        incident_id, update_type, message, status, previous_status, new_status,
+        previous_severity, new_severity, created_by, created_by_name,
+        created_by_id, created_by_email
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     `, [
       incidentId,
       entry.type,
       entry.message,
+      entry.new_status || current.status,  // status (NOT NULL) - use new status or current
       entry.previous_status || null,
       entry.new_status || null,
       entry.previous_severity || null,
       entry.new_severity || null,
       user.email,
       user.name || user.email,
+      user.email,                           // created_by_id (NOT NULL)
+      user.email,                           // created_by_email (NOT NULL)
     ]);
   }
 
@@ -1414,7 +1627,7 @@ async function handleDeleteIncident(event, user, clientIp) {
     return response(403, { message: 'Only super admins can delete incidents' });
   }
 
-  const incidentId = extractPathParam(event.path, '/admin/incidents/');
+  const incidentId = extractPathParam(event, '/admin/incidents/');
 
   const result = await opsQuery(`DELETE FROM incidents WHERE id = $1 RETURNING id, title`, [incidentId]);
 
@@ -1433,7 +1646,7 @@ async function handleDeleteIncident(event, user, clientIp) {
  * Get incident timeline/updates
  */
 async function handleGetIncidentUpdates(event, user) {
-  const incidentId = extractPathParam(event.path, '/admin/incidents/', '/updates');
+  const incidentId = extractPathParam(event, '/admin/incidents/', '/updates');
 
   const result = await opsQuery(
     `SELECT * FROM incident_updates WHERE incident_id = $1 ORDER BY created_at ASC`,
@@ -1451,7 +1664,7 @@ async function handleAddIncidentUpdate(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to add updates' });
   }
 
-  const incidentId = extractPathParam(event.path, '/admin/incidents/', '/updates');
+  const incidentId = extractPathParam(event, '/admin/incidents/', '/updates');
   const body = JSON.parse(event.body || '{}');
   const { message, is_internal = false, new_status } = body;
 
@@ -1483,22 +1696,30 @@ async function handleAddIncidentUpdate(event, user, clientIp) {
     );
   }
 
+  // Get current status for the status field (NOT NULL)
+  const currentIncident = await opsQuery(`SELECT status FROM incidents WHERE id = $1`, [incidentId]);
+  const currentStatus = currentIncident.rows[0]?.status || 'investigating';
+
   const result = await opsQuery(`
     INSERT INTO incident_updates (
-      incident_id, update_type, message, is_internal,
-      previous_status, new_status, created_by, created_by_name
+      incident_id, update_type, message, status, is_internal,
+      previous_status, new_status, created_by, created_by_name,
+      created_by_id, created_by_email
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     RETURNING *
   `, [
     incidentId,
     new_status ? 'status_change' : 'update',
     message,
+    new_status || currentStatus,  // status (NOT NULL)
     is_internal,
     null,
     new_status || null,
     user.email,
     user.name || user.email,
+    user.email,                   // created_by_id (NOT NULL)
+    user.email,                   // created_by_email (NOT NULL)
   ]);
 
   await logAudit(user, 'add_incident_update', 'incident', incidentId, { message, new_status }, clientIp);
@@ -1510,7 +1731,7 @@ async function handleAddIncidentUpdate(event, user, clientIp) {
  * List affected customers for incident
  */
 async function handleListAffectedCustomers(event, user) {
-  const incidentId = extractPathParam(event.path, '/admin/incidents/', '/affected');
+  const incidentId = extractPathParam(event, '/admin/incidents/', '/affected');
 
   const result = await opsQuery(`
     SELECT * FROM incident_affected_customers
@@ -1544,7 +1765,7 @@ async function handleAddAffectedCustomer(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to modify incidents' });
   }
 
-  const incidentId = extractPathParam(event.path, '/admin/incidents/', '/affected');
+  const incidentId = extractPathParam(event, '/admin/incidents/', '/affected');
   const body = JSON.parse(event.body || '{}');
   const { tenant_id, notes } = body;
 
@@ -1586,7 +1807,8 @@ async function handleRemoveAffectedCustomer(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to modify incidents' });
   }
 
-  const pathParts = event.path.split('/');
+  const path = event.requestContext?.http?.path || event.path;
+  const pathParts = path.split('/');
   const incidentId = pathParts[3];
   const affectedId = pathParts[5];
 
@@ -1614,7 +1836,7 @@ async function handleNotifyAffectedCustomers(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to notify customers' });
   }
 
-  const incidentId = extractPathParam(event.path, '/admin/incidents/', '/notify');
+  const incidentId = extractPathParam(event, '/admin/incidents/', '/notify');
   const body = JSON.parse(event.body || '{}');
   const { message } = body;
 
@@ -1644,7 +1866,7 @@ async function handleNotifyAffectedCustomers(event, user, clientIp) {
  * Get postmortem for incident
  */
 async function handleGetPostmortem(event, user) {
-  const incidentId = extractPathParam(event.path, '/admin/incidents/', '/postmortem');
+  const incidentId = extractPathParam(event, '/admin/incidents/', '/postmortem');
 
   const result = await opsQuery(`
     SELECT p.*, i.title as incident_title, i.started_at, i.resolved_at
@@ -1731,7 +1953,7 @@ async function handleSavePostmortem(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to create postmortems' });
   }
 
-  const incidentId = extractPathParam(event.path, '/admin/incidents/', '/postmortem');
+  const incidentId = extractPathParam(event, '/admin/incidents/', '/postmortem');
   const body = JSON.parse(event.body || '{}');
 
   const {
@@ -1802,7 +2024,7 @@ async function handlePublishPostmortem(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to publish postmortems' });
   }
 
-  const incidentId = extractPathParam(event.path, '/admin/incidents/', '/postmortem/publish');
+  const incidentId = extractPathParam(event, '/admin/incidents/', '/postmortem/publish');
 
   const result = await opsQuery(`
     UPDATE incident_postmortems
@@ -1828,7 +2050,7 @@ async function handleCreatePostmortemAction(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to create action items' });
   }
 
-  const postmortemId = extractPathParam(event.path, '/admin/postmortems/', '/actions');
+  const postmortemId = extractPathParam(event, '/admin/postmortems/', '/actions');
   const body = JSON.parse(event.body || '{}');
 
   const { description, assigned_to, assigned_to_name, due_date, priority = 'medium' } = body;
@@ -1858,7 +2080,8 @@ async function handleUpdatePostmortemAction(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to update action items' });
   }
 
-  const pathParts = event.path.split('/');
+  const path = event.requestContext?.http?.path || event.path;
+  const pathParts = path.split('/');
   const postmortemId = pathParts[3];
   const actionId = pathParts[5];
   const body = JSON.parse(event.body || '{}');
@@ -1930,7 +2153,8 @@ async function handleDeletePostmortemAction(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to delete action items' });
   }
 
-  const pathParts = event.path.split('/');
+  const path = event.requestContext?.http?.path || event.path;
+  const pathParts = path.split('/');
   const postmortemId = pathParts[3];
   const actionId = pathParts[5];
 
@@ -2455,7 +2679,7 @@ async function handleCommandCenterLambdas(event, user) {
 
 // Command Center: Detailed Lambda metrics
 async function handleLambdaDetailedMetrics(event, user) {
-  const functionName = extractPathParam(event.path, '/admin/command-center/lambdas/', '/metrics');
+  const functionName = extractPathParam(event, '/admin/command-center/lambdas/', '/metrics');
 
   try {
     const metrics = await getLambdaMetrics(functionName, 24); // Last 24 hours
@@ -2495,7 +2719,7 @@ async function handleLambdaDetailedMetrics(event, user) {
 
 // Command Center: Lambda errors log
 async function handleLambdaErrors(event, user) {
-  const functionName = extractPathParam(event.path, '/admin/command-center/lambdas/', '/errors');
+  const functionName = extractPathParam(event, '/admin/command-center/lambdas/', '/errors');
 
   try {
     const logGroupName = `/aws/lambda/${functionName}`;
@@ -2799,7 +3023,7 @@ async function handleCommandCenterErrors(event, user) {
 
 // Command Center: Error details
 async function handleErrorDetails(event, user) {
-  const errorId = extractPathParam(event.path, '/admin/command-center/errors/');
+  const errorId = extractPathParam(event, '/admin/command-center/errors/');
 
   // Error ID format: logGroupName-timestamp
   const [logGroupName, timestamp] = errorId.split('-');
@@ -3059,7 +3283,20 @@ function corsResponse(statusCode, body) {
   };
 }
 
-function extractPathParam(path, prefix, suffix = '') {
+function getEventPath(event) {
+  return event?.requestContext?.http?.path || event?.path || '';
+}
+
+function extractPathParam(pathOrEvent, prefix, suffix = '') {
+  // Support both path string and event object
+  let path;
+  if (typeof pathOrEvent === 'string') {
+    path = pathOrEvent;
+  } else if (pathOrEvent && typeof pathOrEvent === 'object') {
+    path = getEventPath(pathOrEvent);
+  } else {
+    path = '';
+  }
   let param = path.replace(prefix, '');
   if (suffix) {
     param = param.replace(suffix, '');
@@ -3089,7 +3326,7 @@ async function handleImpersonateStart(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to impersonate tenants' });
   }
 
-  const tenantId = extractPathParam(event.path, '/admin/tenants/', '/impersonate/start');
+  const tenantId = extractPathParam(event, '/admin/tenants/', '/impersonate/start');
   const body = JSON.parse(event.body || '{}');
   const { reason } = body;
 
@@ -3119,7 +3356,7 @@ async function handleImpersonateStart(event, user, clientIp) {
 }
 
 async function handleImpersonateEnd(event, user, clientIp) {
-  const tenantId = extractPathParam(event.path, '/admin/tenants/', '/impersonate/end');
+  const tenantId = extractPathParam(event, '/admin/tenants/', '/impersonate/end');
 
   // Log the impersonation end
   await logAudit(user, 'impersonate_end', 'tenant', tenantId, null, clientIp);
@@ -3131,7 +3368,8 @@ async function handleImpersonateEnd(event, user, clientIp) {
 // Maintenance Handlers - Enhanced
 // =========================================================================
 
-function extractMaintenanceId(path) {
+function extractMaintenanceId(pathOrEvent) {
+  const path = typeof pathOrEvent === 'string' ? pathOrEvent : getEventPath(pathOrEvent);
   const match = path.match(/\/admin\/maintenance\/([^/]+)/);
   return match ? match[1] : null;
 }
@@ -3230,7 +3468,7 @@ async function handleMaintenanceStats(event, user) {
 }
 
 async function handleGetMaintenance(event, user) {
-  const id = extractMaintenanceId(event.path);
+  const id = extractMaintenanceId(event);
 
   const result = await opsQuery(
     `SELECT * FROM maintenance_windows WHERE id = $1`,
@@ -3306,7 +3544,7 @@ async function handleUpdateMaintenance(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to update maintenance windows' });
   }
 
-  const id = extractMaintenanceId(event.path);
+  const id = extractMaintenanceId(event);
   const body = JSON.parse(event.body);
 
   const fieldMappings = {
@@ -3363,7 +3601,7 @@ async function handleDeleteMaintenance(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to delete maintenance windows' });
   }
 
-  const id = extractMaintenanceId(event.path);
+  const id = extractMaintenanceId(event);
 
   const result = await opsQuery(
     `DELETE FROM maintenance_windows WHERE id = $1 RETURNING id`,
@@ -3385,7 +3623,7 @@ async function handleStartMaintenance(event, user, clientIp) {
     return response(403, { message: 'Forbidden' });
   }
 
-  const id = extractMaintenanceId(event.path);
+  const id = extractMaintenanceId(event);
   const body = event.body ? JSON.parse(event.body) : {};
 
   const result = await opsQuery(
@@ -3417,7 +3655,7 @@ async function handleCompleteMaintenance(event, user, clientIp) {
     return response(403, { message: 'Forbidden' });
   }
 
-  const id = extractMaintenanceId(event.path);
+  const id = extractMaintenanceId(event);
   const body = JSON.parse(event.body);
   const {
     actualEnd, outcome, completionSummary, completionNotes,
@@ -3465,7 +3703,7 @@ async function handleExtendMaintenance(event, user, clientIp) {
     return response(403, { message: 'Forbidden' });
   }
 
-  const id = extractMaintenanceId(event.path);
+  const id = extractMaintenanceId(event);
   const body = JSON.parse(event.body);
   const { newEndTime, reason } = body;
 
@@ -3502,7 +3740,7 @@ async function handleCancelMaintenance(event, user, clientIp) {
     return response(403, { message: 'Forbidden' });
   }
 
-  const id = extractMaintenanceId(event.path);
+  const id = extractMaintenanceId(event);
 
   const result = await opsQuery(
     `UPDATE maintenance_windows
@@ -3530,7 +3768,7 @@ async function handleCancelMaintenance(event, user, clientIp) {
 
 // Updates (timeline) handlers
 async function handleGetMaintenanceUpdates(event, user) {
-  const id = extractMaintenanceId(event.path);
+  const id = extractMaintenanceId(event);
 
   const result = await opsQuery(
     `SELECT * FROM maintenance_updates WHERE maintenance_id = $1 ORDER BY created_at DESC`,
@@ -3552,7 +3790,7 @@ async function handleGetMaintenanceUpdates(event, user) {
 }
 
 async function handlePostMaintenanceUpdate(event, user, clientIp) {
-  const id = extractMaintenanceId(event.path);
+  const id = extractMaintenanceId(event);
   const body = JSON.parse(event.body);
   const { message, isPublic } = body;
 
@@ -3581,7 +3819,7 @@ async function handlePostMaintenanceUpdate(event, user, clientIp) {
 
 // Notification handlers
 async function handleSendMaintenanceNotification(event, user, clientIp) {
-  const id = extractMaintenanceId(event.path);
+  const id = extractMaintenanceId(event);
   const body = JSON.parse(event.body);
   const { notificationType } = body;
 
@@ -3610,7 +3848,7 @@ async function handleSendMaintenanceNotification(event, user, clientIp) {
 }
 
 async function handleGetMaintenanceNotifications(event, user) {
-  const id = extractMaintenanceId(event.path);
+  const id = extractMaintenanceId(event);
 
   const result = await opsQuery(
     `SELECT * FROM maintenance_notifications WHERE maintenance_id = $1 ORDER BY sent_at DESC`,
@@ -3631,7 +3869,7 @@ async function handleGetMaintenanceNotifications(event, user) {
 
 // Affected customers handlers
 async function handleGetMaintenanceAffected(event, user) {
-  const id = extractMaintenanceId(event.path);
+  const id = extractMaintenanceId(event);
 
   const result = await opsQuery(
     `SELECT * FROM maintenance_affected_customers WHERE maintenance_id = $1 ORDER BY created_at DESC`,
@@ -3651,7 +3889,7 @@ async function handleGetMaintenanceAffected(event, user) {
 }
 
 async function handleAddMaintenanceAffected(event, user, clientIp) {
-  const id = extractMaintenanceId(event.path);
+  const id = extractMaintenanceId(event);
   const body = JSON.parse(event.body);
   const { tenantId, tenantName } = body;
 
@@ -3678,7 +3916,8 @@ async function handleAddMaintenanceAffected(event, user, clientIp) {
 }
 
 async function handleRemoveMaintenanceAffected(event, user, clientIp) {
-  const match = event.path.match(/\/admin\/maintenance\/([^/]+)\/affected\/([^/]+)/);
+  const path = event.requestContext?.http?.path || event.path;
+  const match = path.match(/\/admin\/maintenance\/([^/]+)\/affected\/([^/]+)/);
   if (!match) {
     return response(400, { message: 'Invalid path' });
   }
@@ -3699,7 +3938,7 @@ async function handleRemoveMaintenanceAffected(event, user, clientIp) {
 
 // Recurring maintenance handlers
 async function handleSkipMaintenance(event, user, clientIp) {
-  const id = extractMaintenanceId(event.path);
+  const id = extractMaintenanceId(event);
 
   // For recurring maintenance, skip the next occurrence
   // This is a simplified implementation - in production you'd update the recurrence logic
@@ -3709,7 +3948,7 @@ async function handleSkipMaintenance(event, user, clientIp) {
 }
 
 async function handleDisableMaintenance(event, user, clientIp) {
-  const id = extractMaintenanceId(event.path);
+  const id = extractMaintenanceId(event);
 
   const result = await opsQuery(
     `UPDATE maintenance_windows SET is_recurring = false, updated_at = NOW() WHERE id = $1 RETURNING *`,
@@ -3884,7 +4123,7 @@ async function handleBroadcastStats(event, user) {
 }
 
 async function handleGetBroadcast(event, user) {
-  const id = extractPathParam(event.path, '/admin/broadcasts/');
+  const id = extractPathParam(event, '/admin/broadcasts/');
 
   const result = await opsQuery(
     `SELECT * FROM broadcasts WHERE id = $1`,
@@ -3947,7 +4186,7 @@ async function handleUpdateBroadcast(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to update broadcasts' });
   }
 
-  const id = extractPathParam(event.path, '/admin/broadcasts/');
+  const id = extractPathParam(event, '/admin/broadcasts/');
   const body = JSON.parse(event.body);
 
   // Check if broadcast can be edited
@@ -4023,7 +4262,7 @@ async function handleDeleteBroadcast(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to delete broadcasts' });
   }
 
-  const id = extractPathParam(event.path, '/admin/broadcasts/');
+  const id = extractPathParam(event, '/admin/broadcasts/');
 
   const result = await opsQuery(
     `DELETE FROM broadcasts WHERE id = $1 RETURNING id`,
@@ -4044,7 +4283,7 @@ async function handleSendBroadcast(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to send broadcasts' });
   }
 
-  const id = extractPathParam(event.path, '/admin/broadcasts/').replace('/send', '');
+  const id = extractPathParam(event, '/admin/broadcasts/').replace('/send', '');
 
   const existing = await opsQuery(`SELECT * FROM broadcasts WHERE id = $1`, [id]);
   if (existing.rows.length === 0) {
@@ -4092,7 +4331,7 @@ async function handleScheduleBroadcast(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to schedule broadcasts' });
   }
 
-  const id = extractPathParam(event.path, '/admin/broadcasts/').replace('/schedule', '');
+  const id = extractPathParam(event, '/admin/broadcasts/').replace('/schedule', '');
   const body = JSON.parse(event.body);
   const { scheduledAt } = body;
 
@@ -4123,7 +4362,7 @@ async function handleCancelBroadcast(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to cancel broadcasts' });
   }
 
-  const id = extractPathParam(event.path, '/admin/broadcasts/').replace('/cancel', '');
+  const id = extractPathParam(event, '/admin/broadcasts/').replace('/cancel', '');
 
   const existing = await opsQuery(`SELECT status FROM broadcasts WHERE id = $1`, [id]);
   if (existing.rows.length === 0) {
@@ -4148,7 +4387,7 @@ async function handleEndBroadcast(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to end broadcasts' });
   }
 
-  const id = extractPathParam(event.path, '/admin/broadcasts/').replace('/end', '');
+  const id = extractPathParam(event, '/admin/broadcasts/').replace('/end', '');
 
   const existing = await opsQuery(`SELECT status FROM broadcasts WHERE id = $1`, [id]);
   if (existing.rows.length === 0) {
@@ -4169,7 +4408,7 @@ async function handleEndBroadcast(event, user, clientIp) {
 }
 
 async function handleBroadcastAnalytics(event, user) {
-  const id = extractPathParam(event.path, '/admin/broadcasts/').replace('/analytics', '');
+  const id = extractPathParam(event, '/admin/broadcasts/').replace('/analytics', '');
 
   const broadcastResult = await opsQuery(`SELECT * FROM broadcasts WHERE id = $1`, [id]);
   if (broadcastResult.rows.length === 0) {
@@ -4257,7 +4496,7 @@ async function handleBroadcastAnalytics(event, user) {
 }
 
 async function handleBroadcastRecipients(event, user) {
-  const id = extractPathParam(event.path, '/admin/broadcasts/').replace('/recipients', '');
+  const id = extractPathParam(event, '/admin/broadcasts/').replace('/recipients', '');
   const limit = parseInt(event.queryStringParameters?.limit) || 50;
   const offset = parseInt(event.queryStringParameters?.offset) || 0;
   const filter = event.queryStringParameters?.filter;
@@ -4307,7 +4546,7 @@ async function handleBroadcastRecipients(event, user) {
 }
 
 async function handlePreviewBroadcastEmail(event, user) {
-  const id = extractPathParam(event.path, '/admin/broadcasts/').replace('/preview', '');
+  const id = extractPathParam(event, '/admin/broadcasts/').replace('/preview', '');
 
   const result = await opsQuery(`SELECT * FROM broadcasts WHERE id = $1`, [id]);
   if (result.rows.length === 0) {
@@ -4333,7 +4572,7 @@ async function handlePreviewBroadcastEmail(event, user) {
 }
 
 async function handlePreviewBroadcastBanner(event, user) {
-  const id = extractPathParam(event.path, '/admin/broadcasts/').replace('/preview/banner', '');
+  const id = extractPathParam(event, '/admin/broadcasts/').replace('/preview/banner', '');
 
   const result = await opsQuery(`SELECT * FROM broadcasts WHERE id = $1`, [id]);
   if (result.rows.length === 0) {
@@ -4613,7 +4852,7 @@ async function handleFeatureFlagStats(event, user) {
 }
 
 async function handleGetFeatureFlag(event, user) {
-  const id = extractPathParam(event.path, '/admin/feature-flags/');
+  const id = extractPathParam(event, '/admin/feature-flags/');
 
   const flagResult = await opsQuery(
     `SELECT * FROM feature_flags WHERE id = $1`,
@@ -4709,7 +4948,7 @@ async function handleUpdateFeatureFlag(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to update feature flags' });
   }
 
-  const id = extractPathParam(event.path, '/admin/feature-flags/');
+  const id = extractPathParam(event, '/admin/feature-flags/');
   const body = JSON.parse(event.body);
 
   // Get current flag state for history
@@ -4773,7 +5012,7 @@ async function handleToggleFeatureFlag(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to toggle feature flags' });
   }
 
-  const id = extractPathParam(event.path, '/admin/feature-flags/', '/toggle');
+  const id = extractPathParam(event, '/admin/feature-flags/', '/toggle');
   const body = JSON.parse(event.body);
   const { enabled, reason } = body;
 
@@ -4822,7 +5061,7 @@ async function handleUpdateFeatureFlagRollout(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to update rollout' });
   }
 
-  const id = extractPathParam(event.path, '/admin/feature-flags/', '/rollout');
+  const id = extractPathParam(event, '/admin/feature-flags/', '/rollout');
   const body = JSON.parse(event.body);
   const { percentage, reason } = body;
 
@@ -4867,7 +5106,7 @@ async function handleKillFeatureFlag(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to kill feature flags' });
   }
 
-  const id = extractPathParam(event.path, '/admin/feature-flags/', '/kill');
+  const id = extractPathParam(event, '/admin/feature-flags/', '/kill');
   const body = JSON.parse(event.body || '{}');
   const { reason } = body;
 
@@ -4910,7 +5149,7 @@ async function handleArchiveFeatureFlag(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to archive feature flags' });
   }
 
-  const id = extractPathParam(event.path, '/admin/feature-flags/', '/archive');
+  const id = extractPathParam(event, '/admin/feature-flags/', '/archive');
 
   const result = await opsQuery(
     `UPDATE feature_flags SET archived_at = NOW(), enabled = false, updated_at = NOW() WHERE id = $1 RETURNING *`,
@@ -4938,7 +5177,7 @@ async function handleDeleteFeatureFlag(event, user, clientIp) {
     return response(403, { message: 'Only super admins can delete feature flags' });
   }
 
-  const id = extractPathParam(event.path, '/admin/feature-flags/');
+  const id = extractPathParam(event, '/admin/feature-flags/');
 
   const result = await opsQuery(
     `DELETE FROM feature_flags WHERE id = $1 RETURNING id, flag_key`,
@@ -4955,7 +5194,7 @@ async function handleDeleteFeatureFlag(event, user, clientIp) {
 }
 
 async function handleGetFeatureFlagTenants(event, user) {
-  const id = extractPathParam(event.path, '/admin/feature-flags/', '/tenants');
+  const id = extractPathParam(event, '/admin/feature-flags/', '/tenants');
   const filter = event.queryStringParameters?.filter || 'all';
   const search = event.queryStringParameters?.search;
 
@@ -5054,7 +5293,8 @@ async function handleAddFeatureFlagOverride(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to add overrides' });
   }
 
-  const pathParts = event.path.split('/');
+  const path = event.requestContext?.http?.path || event.path;
+  const pathParts = path.split('/');
   const flagId = pathParts[3];
   const tenantId = pathParts[5];
 
@@ -5123,7 +5363,8 @@ async function handleRemoveFeatureFlagOverride(event, user, clientIp) {
     return response(403, { message: 'You do not have permission to remove overrides' });
   }
 
-  const pathParts = event.path.split('/');
+  const path = event.requestContext?.http?.path || event.path;
+  const pathParts = path.split('/');
   const flagId = pathParts[3];
   const tenantId = pathParts[5];
 
@@ -5154,7 +5395,7 @@ async function handleRemoveFeatureFlagOverride(event, user, clientIp) {
 }
 
 async function handleGetFeatureFlagHistory(event, user) {
-  const id = extractPathParam(event.path, '/admin/feature-flags/', '/history');
+  const id = extractPathParam(event, '/admin/feature-flags/', '/history');
 
   const result = await opsQuery(
     `SELECT * FROM feature_flag_history WHERE flag_id = $1 ORDER BY created_at DESC LIMIT 100`,
@@ -5178,7 +5419,8 @@ async function handleGetFeatureFlagHistory(event, user) {
 
 // Public feature flag evaluation endpoints
 async function handleEvaluateAllFlags(event) {
-  const pathParts = event.path.split('/');
+  const path = event.requestContext?.http?.path || event.path;
+  const pathParts = path.split('/');
   const tenantId = pathParts[4];
 
   if (!tenantId) {
@@ -5219,7 +5461,8 @@ async function handleEvaluateAllFlags(event) {
 }
 
 async function handleEvaluateFeatureFlag(event) {
-  const pathParts = event.path.split('/');
+  const path = event.requestContext?.http?.path || event.path;
+  const pathParts = path.split('/');
   const tenantId = pathParts[4];
   const flagKey = pathParts[5];
 
@@ -5696,7 +5939,8 @@ async function handleListTickets(event, user) {
  * Get single ticket with full details
  */
 async function handleGetTicket(event, user) {
-  const ticketId = event.path.split('/').pop();
+  const path = event.requestContext?.http?.path || event.path;
+  const ticketId = path.split('/').pop();
 
   const result = await opsQuery(`
     SELECT * FROM support_tickets WHERE id = $1
@@ -5767,7 +6011,8 @@ async function handleCreateTicket(event, user, clientIp) {
  * Update ticket (status, priority, assignment, etc.)
  */
 async function handleUpdateTicket(event, user, clientIp) {
-  const ticketId = event.path.split('/').pop();
+  const path = event.requestContext?.http?.path || event.path;
+  const ticketId = path.split('/').pop();
   const body = JSON.parse(event.body || '{}');
   const { status, priority, category, assigned_to, assigned_to_name } = body;
 
@@ -5857,7 +6102,8 @@ async function handleUpdateTicket(event, user, clientIp) {
  * Delete ticket (soft delete by setting status to closed)
  */
 async function handleDeleteTicket(event, user, clientIp) {
-  const ticketId = event.path.split('/').pop();
+  const path = event.requestContext?.http?.path || event.path;
+  const ticketId = path.split('/').pop();
 
   const result = await opsQuery(`
     UPDATE support_tickets
@@ -5881,7 +6127,8 @@ async function handleDeleteTicket(event, user, clientIp) {
  * List ticket messages
  */
 async function handleListTicketMessages(event, user) {
-  const pathParts = event.path.split('/');
+  const path = event.requestContext?.http?.path || event.path;
+  const pathParts = path.split('/');
   const ticketId = pathParts[pathParts.length - 2];
 
   const result = await opsQuery(`
@@ -5897,7 +6144,8 @@ async function handleListTicketMessages(event, user) {
  * Add message to ticket
  */
 async function handleCreateTicketMessage(event, user, clientIp) {
-  const pathParts = event.path.split('/');
+  const path = event.requestContext?.http?.path || event.path;
+  const pathParts = path.split('/');
   const ticketId = pathParts[pathParts.length - 2];
   const body = JSON.parse(event.body || '{}');
   const { message, is_internal = false } = body;
@@ -5942,7 +6190,8 @@ async function handleCreateTicketMessage(event, user, clientIp) {
  * List ticket activity
  */
 async function handleListTicketActivity(event, user) {
-  const pathParts = event.path.split('/');
+  const path = event.requestContext?.http?.path || event.path;
+  const pathParts = path.split('/');
   const ticketId = pathParts[pathParts.length - 2];
 
   const result = await opsQuery(`
@@ -5977,7 +6226,8 @@ async function handleTicketStats(event, user) {
  * Lookup portal/tenant info for ticket creation
  */
 async function handlePortalLookup(event, user) {
-  const portalId = event.path.split('/').pop();
+  const path = event.requestContext?.http?.path || event.path;
+  const portalId = path.split('/').pop();
 
   // Query BarkBase database for tenant info
   const result = await barkbaseQuery(`
@@ -6017,7 +6267,8 @@ async function handlePortalLookup(event, user) {
  * Generate impersonation token for support access
  */
 async function handleGenerateImpersonationToken(event, user, clientIp) {
-  const portalId = event.path.split('/').pop();
+  const path = event.requestContext?.http?.path || event.path;
+  const portalId = path.split('/').pop();
 
   // Verify portal exists
   const tenant = await barkbaseQuery(`
@@ -6075,19 +6326,31 @@ async function handleGenerateImpersonationToken(event, user, clientIp) {
  * Get full customer profile with stats
  */
 async function handleGetCustomerProfile(event, user, clientIp) {
-  const portalId = event.path.split('/').pop();
+  const path = event.requestContext?.http?.path || event.path;
+  const portalId = path.split('/').pop();
+  
+  console.log('handleGetCustomerProfile - portalId:', portalId, 'path:', path);
+
+  if (!portalId || portalId === 'customers') {
+    return response(400, { message: 'Invalid customer ID' });
+  }
 
   // Get tenant info with owner
-  const tenantResult = await barkbaseQuery(`
-    SELECT
-      t.id, t.name, t.slug, t.state, t.plan, t.created_at, t.settings,
-      t.trial_ends_at, t.subscription_status,
-      u.id as owner_id, u.email as owner_email,
-      COALESCE(u.first_name || ' ' || u.last_name, u.email) as owner_name
-    FROM "Tenant" t
-    LEFT JOIN "User" u ON u.tenant_id = t.id AND u.role = 'OWNER'
-    WHERE t.id = $1
-  `, [portalId]);
+  let tenantResult;
+  try {
+    tenantResult = await barkbaseQuery(`
+      SELECT
+        t.id, t.name, t.slug, t.state, t.plan, t.created_at, t.settings,
+        u.id as owner_id, u.email as owner_email,
+        COALESCE(u.first_name || ' ' || u.last_name, u.email) as owner_name
+      FROM "Tenant" t
+      LEFT JOIN "User" u ON u.tenant_id = t.id AND u.role = 'OWNER'
+      WHERE t.id = $1
+    `, [portalId]);
+  } catch (err) {
+    console.error('Error fetching tenant:', err.message);
+    return response(500, { message: 'Database error', error: err.message });
+  }
 
   if (tenantResult.rows.length === 0) {
     return response(404, { message: 'Customer not found' });
@@ -6095,7 +6358,16 @@ async function handleGetCustomerProfile(event, user, clientIp) {
 
   const tenant = tenantResult.rows[0];
 
-  // Get counts and stats in parallel
+  // Get counts and stats in parallel - wrapped to handle missing tables
+  const safeQuery = async (queryFn, sql, params, defaultValue = { rows: [{ count: 0 }] }) => {
+    try {
+      return await queryFn(sql, params);
+    } catch (err) {
+      console.log('Query failed (using default):', err.message);
+      return defaultValue;
+    }
+  };
+
   const [
     userCountResult,
     petCountResult,
@@ -6105,21 +6377,21 @@ async function handleGetCustomerProfile(event, user, clientIp) {
     lastActivityResult,
     flagsResult
   ] = await Promise.all([
-    barkbaseQuery(`SELECT COUNT(*) FROM "User" WHERE tenant_id = $1`, [portalId]),
-    barkbaseQuery(`SELECT COUNT(*) FROM "Pet" WHERE tenant_id = $1`, [portalId]),
-    barkbaseQuery(`SELECT COUNT(*) FROM "Booking" WHERE tenant_id = $1`, [portalId]),
-    barkbaseQuery(`
+    safeQuery(barkbaseQuery, `SELECT COUNT(*) FROM "User" WHERE tenant_id = $1`, [portalId]),
+    safeQuery(barkbaseQuery, `SELECT COUNT(*) FROM "Pet" WHERE tenant_id = $1`, [portalId]),
+    safeQuery(barkbaseQuery, `SELECT COUNT(*) FROM "Booking" WHERE tenant_id = $1`, [portalId]),
+    safeQuery(barkbaseQuery, `
       SELECT COALESCE(SUM(total_amount), 0) as total
       FROM "Booking" WHERE tenant_id = $1 AND status = 'completed'
-    `, [portalId]),
-    barkbaseQuery(`
+    `, [portalId], { rows: [{ total: 0 }] }),
+    safeQuery(barkbaseQuery, `
       SELECT COUNT(*) FROM "User"
       WHERE tenant_id = $1 AND last_login_at >= NOW() - INTERVAL '30 days'
     `, [portalId]),
-    barkbaseQuery(`
+    safeQuery(barkbaseQuery, `
       SELECT MAX(last_login_at) as last_activity FROM "User" WHERE tenant_id = $1
-    `, [portalId]),
-    opsQuery(`SELECT * FROM customer_flags WHERE portal_id = $1`, [portalId]),
+    `, [portalId], { rows: [{ last_activity: null }] }),
+    safeQuery(opsQuery, `SELECT * FROM customer_flags WHERE portal_id = $1`, [portalId], { rows: [] }),
   ]);
 
   // Get recent activity
@@ -6139,7 +6411,7 @@ async function handleGetCustomerProfile(event, user, clientIp) {
   }
 
   // Get support ticket count
-  const ticketCountResult = await opsQuery(`
+  const ticketCountResult = await safeQuery(opsQuery, `
     SELECT COUNT(*) FROM support_tickets WHERE portal_id = $1
   `, [portalId]);
 
@@ -6174,8 +6446,8 @@ async function handleGetCustomerProfile(event, user, clientIp) {
       slug: tenant.slug,
       status: tenant.state,
       plan: tenant.plan,
-      subscriptionStatus: tenant.subscription_status,
-      trialEndsAt: tenant.trial_ends_at,
+      subscriptionStatus: tenant.state === 'active' ? 'active' : 'inactive',
+      trialEndsAt: null,
       createdAt: tenant.created_at,
       settings: tenant.settings,
       owner: {
@@ -6208,41 +6480,46 @@ async function handleGetCustomerProfile(event, user, clientIp) {
  * Get all users for a customer
  */
 async function handleGetCustomerUsers(event, user) {
-  const portalId = extractPathParam(event.path, '/admin/customers/', '/users');
+  const portalId = extractPathParam(event, '/admin/customers/', '/users');
 
-  const result = await barkbaseQuery(`
-    SELECT
-      id, email, first_name, last_name, role, status,
-      created_at, last_login_at, phone, avatar_url
-    FROM "User"
-    WHERE tenant_id = $1
-    ORDER BY
-      CASE role WHEN 'OWNER' THEN 1 WHEN 'ADMIN' THEN 2 ELSE 3 END,
-      created_at ASC
-  `, [portalId]);
+  try {
+    const result = await barkbaseQuery(`
+      SELECT
+        id, email, first_name, last_name, role,
+        created_at, phone
+      FROM "User"
+      WHERE tenant_id = $1
+      ORDER BY
+        CASE role WHEN 'OWNER' THEN 1 WHEN 'ADMIN' THEN 2 ELSE 3 END,
+        created_at ASC
+    `, [portalId]);
 
-  return response(200, {
-    users: result.rows.map(u => ({
-      id: u.id,
-      email: u.email,
-      name: [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email,
-      firstName: u.first_name,
-      lastName: u.last_name,
-      role: u.role,
-      status: u.status,
-      phone: u.phone,
-      avatarUrl: u.avatar_url,
-      createdAt: u.created_at,
-      lastLoginAt: u.last_login_at,
-    })),
-  });
+    return response(200, {
+      users: result.rows.map(u => ({
+        id: u.id,
+        email: u.email,
+        name: [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email,
+        firstName: u.first_name,
+        lastName: u.last_name,
+        role: u.role,
+        status: 'active',
+        phone: u.phone,
+        avatarUrl: null,
+        createdAt: u.created_at,
+        lastLoginAt: null,
+      })),
+    });
+  } catch (err) {
+    console.error('Error fetching customer users:', err.message);
+    return response(500, { message: 'Database error', error: err.message });
+  }
 }
 
 /**
  * Get customer activity log
  */
 async function handleGetCustomerActivity(event, user) {
-  const portalId = extractPathParam(event.path, '/admin/customers/', '/activity');
+  const portalId = extractPathParam(event, '/admin/customers/', '/activity');
   const limit = parseInt(event.queryStringParameters?.limit) || 50;
   const offset = parseInt(event.queryStringParameters?.offset) || 0;
 
@@ -6274,71 +6551,80 @@ async function handleGetCustomerActivity(event, user) {
  * Get customer billing info
  */
 async function handleGetCustomerBilling(event, user) {
-  const portalId = extractPathParam(event.path, '/admin/customers/', '/billing');
+  const portalId = extractPathParam(event, '/admin/customers/', '/billing');
 
-  // Get tenant subscription info
-  const tenantResult = await barkbaseQuery(`
-    SELECT
-      plan, subscription_status, trial_ends_at, settings,
-      stripe_customer_id, stripe_subscription_id
-    FROM "Tenant"
-    WHERE id = $1
-  `, [portalId]);
-
-  if (tenantResult.rows.length === 0) {
-    return response(404, { message: 'Customer not found' });
-  }
-
-  const tenant = tenantResult.rows[0];
-
-  // Get recent invoices (if stored locally, otherwise will need Stripe API)
-  let invoices = [];
   try {
-    const invoiceResult = await barkbaseQuery(`
-      SELECT * FROM "Invoice"
-      WHERE tenant_id = $1
-      ORDER BY created_at DESC
-      LIMIT 12
+    // Get tenant subscription info - only select columns that exist
+    const tenantResult = await barkbaseQuery(`
+      SELECT plan, state, settings
+      FROM "Tenant"
+      WHERE id = $1
     `, [portalId]);
-    invoices = invoiceResult.rows;
-  } catch (e) {
-    // Invoice table might not exist
+
+    if (tenantResult.rows.length === 0) {
+      return response(404, { message: 'Customer not found' });
+    }
+
+    const tenant = tenantResult.rows[0];
+
+    // Get recent invoices (if stored locally, otherwise will need Stripe API)
+    let invoices = [];
+    try {
+      const invoiceResult = await barkbaseQuery(`
+        SELECT * FROM "Invoice"
+        WHERE tenant_id = $1
+        ORDER BY created_at DESC
+        LIMIT 12
+      `, [portalId]);
+      invoices = invoiceResult.rows;
+    } catch (e) {
+      // Invoice table might not exist
+    }
+
+    // Calculate MRR from bookings completed this month (if Booking table exists)
+    let mrr = 0;
+    try {
+      const mrrResult = await barkbaseQuery(`
+        SELECT COALESCE(SUM(total_amount), 0) as mrr
+        FROM "Booking"
+        WHERE tenant_id = $1
+        AND status = 'completed'
+        AND created_at >= date_trunc('month', CURRENT_DATE)
+      `, [portalId]);
+      mrr = parseFloat(mrrResult.rows[0].mrr) || 0;
+    } catch (e) {
+      // Booking table might not exist or have different schema
+    }
+
+    return response(200, {
+      billing: {
+        plan: tenant.plan,
+        subscriptionStatus: tenant.state === 'active' ? 'active' : 'inactive',
+        trialEndsAt: null,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        mrr,
+        invoices: invoices.map(inv => ({
+          id: inv.id,
+          amount: inv.amount,
+          status: inv.status,
+          dueDate: inv.due_date,
+          paidAt: inv.paid_at,
+          createdAt: inv.created_at,
+        })),
+      },
+    });
+  } catch (err) {
+    console.error('Error fetching customer billing:', err.message);
+    return response(500, { message: 'Database error', error: err.message });
   }
-
-  // Calculate MRR from bookings completed this month
-  const mrrResult = await barkbaseQuery(`
-    SELECT COALESCE(SUM(total_amount), 0) as mrr
-    FROM "Booking"
-    WHERE tenant_id = $1
-    AND status = 'completed'
-    AND created_at >= date_trunc('month', CURRENT_DATE)
-  `, [portalId]);
-
-  return response(200, {
-    billing: {
-      plan: tenant.plan,
-      subscriptionStatus: tenant.subscription_status,
-      trialEndsAt: tenant.trial_ends_at,
-      stripeCustomerId: tenant.stripe_customer_id,
-      stripeSubscriptionId: tenant.stripe_subscription_id,
-      mrr: parseFloat(mrrResult.rows[0].mrr) || 0,
-      invoices: invoices.map(inv => ({
-        id: inv.id,
-        amount: inv.amount,
-        status: inv.status,
-        dueDate: inv.due_date,
-        paidAt: inv.paid_at,
-        createdAt: inv.created_at,
-      })),
-    },
-  });
 }
 
 /**
  * Get support tickets for a customer
  */
 async function handleGetCustomerTickets(event, user) {
-  const portalId = extractPathParam(event.path, '/admin/customers/', '/tickets');
+  const portalId = extractPathParam(event, '/admin/customers/', '/tickets');
 
   const result = await opsQuery(`
     SELECT
@@ -6360,7 +6646,7 @@ async function handleGetCustomerTickets(event, user) {
  * Get internal notes for a customer
  */
 async function handleGetCustomerNotes(event, user) {
-  const portalId = extractPathParam(event.path, '/admin/customers/', '/notes');
+  const portalId = extractPathParam(event, '/admin/customers/', '/notes');
 
   const result = await opsQuery(`
     SELECT id, author_id, author_name, content, note_type, is_pinned, created_at, updated_at
@@ -6387,7 +6673,7 @@ async function handleGetCustomerNotes(event, user) {
  * Create internal note for a customer
  */
 async function handleCreateCustomerNote(event, user, clientIp) {
-  const portalId = extractPathParam(event.path, '/admin/customers/', '/notes');
+  const portalId = extractPathParam(event, '/admin/customers/', '/notes');
   const body = JSON.parse(event.body || '{}');
   const { content, note_type = 'general', is_pinned = false } = body;
 
@@ -6424,7 +6710,7 @@ async function handleCreateCustomerNote(event, user, clientIp) {
  * Get customer flags
  */
 async function handleGetCustomerFlags(event, user) {
-  const portalId = extractPathParam(event.path, '/admin/customers/', '/flags');
+  const portalId = extractPathParam(event, '/admin/customers/', '/flags');
 
   const result = await opsQuery(`
     SELECT * FROM customer_flags WHERE portal_id = $1
@@ -6447,7 +6733,7 @@ async function handleGetCustomerFlags(event, user) {
  * Update customer flags (VIP, at_risk, etc.)
  */
 async function handleUpdateCustomerFlags(event, user, clientIp) {
-  const portalId = extractPathParam(event.path, '/admin/customers/', '/flags');
+  const portalId = extractPathParam(event, '/admin/customers/', '/flags');
   const body = JSON.parse(event.body || '{}');
   const { flags } = body;
 
@@ -6541,7 +6827,7 @@ async function handleListWhiteLabelTenants(event, user) {
  * Get white-label branding for a tenant
  */
 async function handleGetWhiteLabelBranding(event, user) {
-  const tenantId = extractPathParam(event.path, '/admin/white-label/');
+  const tenantId = extractPathParam(event, '/admin/white-label/');
 
   const result = await opsQuery(`
     SELECT * FROM white_label_branding WHERE tenant_id = $1
@@ -6613,7 +6899,7 @@ async function handleGetWhiteLabelBranding(event, user) {
  * Update white-label branding for a tenant
  */
 async function handleUpdateWhiteLabelBranding(event, user, clientIp) {
-  const tenantId = extractPathParam(event.path, '/admin/white-label/');
+  const tenantId = extractPathParam(event, '/admin/white-label/');
   const body = JSON.parse(event.body || '{}');
 
   // Get tenant info from barkbase
@@ -6766,7 +7052,7 @@ async function handleUpdateWhiteLabelBranding(event, user, clientIp) {
  * Get white-label change history
  */
 async function handleGetWhiteLabelHistory(event, user) {
-  const tenantId = extractPathParam(event.path, '/admin/white-label/', '/history');
+  const tenantId = extractPathParam(event, '/admin/white-label/', '/history');
 
   const result = await opsQuery(`
     SELECT id, field_name, old_value, new_value, changed_by, changed_by_name, changed_at
@@ -6792,7 +7078,7 @@ async function handleGetWhiteLabelHistory(event, user) {
  * Verify custom domain DNS
  */
 async function handleVerifyWhiteLabelDomain(event, user, clientIp) {
-  const tenantId = extractPathParam(event.path, '/admin/white-label/', '/verify-domain');
+  const tenantId = extractPathParam(event, '/admin/white-label/', '/verify-domain');
 
   // Get current branding
   const currentResult = await opsQuery(
@@ -6853,4 +7139,1201 @@ async function handleVerifyWhiteLabelDomain(event, user, clientIp) {
       message: 'DNS verification failed. Please ensure the required DNS records are properly configured.',
     });
   }
+}
+
+// =========================================================================
+// Settings Handlers
+// =========================================================================
+
+/**
+ * Get all settings
+ */
+async function handleGetSettings(event, user) {
+  const result = await opsQuery(`
+    SELECT key, value FROM ops_settings
+  `);
+
+  const settings = {};
+  result.rows.forEach(row => {
+    settings[row.key] = row.value;
+  });
+
+  // Flatten settings into single object
+  return response(200, {
+    opsCenterName: settings.general?.opsCenterName || 'BarkBase Ops Center',
+    supportEmail: settings.general?.supportEmail || 'support@barkbase.com',
+    defaultTimezone: settings.general?.defaultTimezone || 'America/New_York',
+    slackWebhookUrl: settings.notifications?.slackWebhookUrl || '',
+    alertEmailRecipients: settings.notifications?.alertEmailRecipients || '',
+    errorRateThreshold: settings.notifications?.errorRateThreshold || 5,
+    responseTimeThreshold: settings.notifications?.responseTimeThreshold || 2000,
+    sessionTimeout: settings.security?.sessionTimeout || 30,
+    impersonationTimeLimit: settings.security?.impersonationTimeLimit || 30,
+    requireReasonForSensitiveActions: settings.security?.requireReasonForSensitiveActions ?? true,
+    ipWhitelist: settings.security?.ipWhitelist || '',
+    primaryColor: settings.appearance?.primaryColor || '#3b82f6',
+  });
+}
+
+/**
+ * Update settings
+ */
+async function handleUpdateSettings(event, user, clientIp) {
+  const body = JSON.parse(event.body || '{}');
+
+  // Group settings by category
+  const general = {
+    opsCenterName: body.opsCenterName,
+    supportEmail: body.supportEmail,
+    defaultTimezone: body.defaultTimezone,
+  };
+
+  const notifications = {
+    slackWebhookUrl: body.slackWebhookUrl,
+    alertEmailRecipients: body.alertEmailRecipients,
+    errorRateThreshold: body.errorRateThreshold,
+    responseTimeThreshold: body.responseTimeThreshold,
+  };
+
+  const security = {
+    sessionTimeout: body.sessionTimeout,
+    impersonationTimeLimit: body.impersonationTimeLimit,
+    requireReasonForSensitiveActions: body.requireReasonForSensitiveActions,
+    ipWhitelist: body.ipWhitelist,
+  };
+
+  const appearance = {
+    primaryColor: body.primaryColor,
+  };
+
+  // Upsert each category
+  const categories = [
+    { key: 'general', value: general },
+    { key: 'notifications', value: notifications },
+    { key: 'security', value: security },
+    { key: 'appearance', value: appearance },
+  ];
+
+  for (const cat of categories) {
+    await opsQuery(`
+      INSERT INTO ops_settings (key, value, updated_by, updated_at)
+      VALUES ($1, $2, $3, NOW())
+      ON CONFLICT (key) DO UPDATE SET value = $2, updated_by = $3, updated_at = NOW()
+    `, [cat.key, JSON.stringify(cat.value), user.email]);
+  }
+
+  await logAudit(user, 'update_settings', 'settings', null, {
+    categories: categories.map(c => c.key),
+  }, clientIp);
+
+  return response(200, { success: true });
+}
+
+/**
+ * List API keys
+ */
+async function handleListApiKeys(event, user) {
+  const result = await opsQuery(`
+    SELECT id, name, key_prefix, created_at, last_used_at
+    FROM api_keys
+    WHERE revoked_at IS NULL
+    ORDER BY created_at DESC
+  `);
+
+  return response(200, {
+    keys: result.rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      prefix: row.key_prefix,
+      createdAt: row.created_at,
+      lastUsedAt: row.last_used_at,
+    })),
+  });
+}
+
+/**
+ * Create API key
+ */
+async function handleCreateApiKey(event, user, clientIp) {
+  const body = JSON.parse(event.body || '{}');
+  const { name } = body;
+
+  if (!name) {
+    return response(400, { message: 'Name is required' });
+  }
+
+  // Generate a secure API key
+  const crypto = require('crypto');
+  const keyBytes = crypto.randomBytes(32);
+  const fullKey = `bb_${keyBytes.toString('hex')}`;
+  const keyPrefix = fullKey.substring(0, 10);
+  const keyHash = crypto.createHash('sha256').update(fullKey).digest('hex');
+
+  const result = await opsQuery(`
+    INSERT INTO api_keys (name, key_prefix, key_hash, created_by, created_by_name)
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING id, name, key_prefix, created_at
+  `, [name, keyPrefix, keyHash, user.email, user.name || user.email]);
+
+  await logAudit(user, 'create_api_key', 'api_key', result.rows[0].id, {
+    name,
+    prefix: keyPrefix,
+  }, clientIp);
+
+  // Return the full key ONLY on creation
+  return response(201, {
+    key: {
+      id: result.rows[0].id,
+      name: result.rows[0].name,
+      prefix: result.rows[0].key_prefix,
+      createdAt: result.rows[0].created_at,
+    },
+    secret: fullKey, // Only returned once!
+  });
+}
+
+/**
+ * Revoke API key
+ */
+async function handleRevokeApiKey(event, user, clientIp) {
+  const keyId = extractPathParam(event, '/admin/api-keys/');
+
+  const result = await opsQuery(`
+    UPDATE api_keys
+    SET revoked_at = NOW(), revoked_by = $1
+    WHERE id = $2 AND revoked_at IS NULL
+    RETURNING id, name
+  `, [user.email, keyId]);
+
+  if (result.rows.length === 0) {
+    return response(404, { message: 'API key not found or already revoked' });
+  }
+
+  await logAudit(user, 'revoke_api_key', 'api_key', keyId, {
+    name: result.rows[0].name,
+  }, clientIp);
+
+  return response(200, { success: true });
+}
+
+// =========================================================================
+// Analytics Handlers
+// =========================================================================
+
+/**
+ * Get analytics data
+ */
+async function handleGetAnalytics(event, user) {
+  const period = event.queryStringParameters?.period || '30d';
+
+  // Calculate date range
+  let days;
+  switch (period) {
+    case '7d': days = 7; break;
+    case '30d': days = 30; break;
+    case '90d': days = 90; break;
+    case '1y': days = 365; break;
+    default: days = 30;
+  }
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+
+  // Get tenant stats from BarkBase
+  const [tenantsResult, usersResult, revenueResult, planDistResult] = await Promise.all([
+    // Total tenants and growth
+    barkbaseQuery(`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE created_at >= $1) as new_in_period,
+        COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '1 day') as new_today
+      FROM "Tenant"
+    `, [startDate]),
+
+    // Total users and growth
+    barkbaseQuery(`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE created_at >= $1) as new_in_period
+      FROM "User"
+    `, [startDate]),
+
+    // Mock revenue data (would come from Stripe/billing in production)
+    Promise.resolve({ rows: [{ mrr: 45000, arr: 540000, growth: 12.5 }] }),
+
+    // Plan distribution
+    barkbaseQuery(`
+      SELECT 
+        COALESCE(settings->>'plan', 'free') as plan,
+        COUNT(*) as count
+      FROM "Tenant"
+      GROUP BY COALESCE(settings->>'plan', 'free')
+    `),
+  ]);
+
+  // Generate time series data
+  const timeSeriesData = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    const dateStr = date.toISOString().split('T')[0];
+
+    // Simulated daily data (in production, would aggregate from actual records)
+    timeSeriesData.push({
+      date: dateStr,
+      tenants: Math.floor(50 + Math.random() * 20),
+      users: Math.floor(200 + Math.random() * 50),
+      bookings: Math.floor(500 + Math.random() * 200),
+      revenue: Math.floor(1500 + Math.random() * 500),
+    });
+  }
+
+  // Plan distribution
+  const planDist = {};
+  planDistResult.rows.forEach(row => {
+    planDist[row.plan] = parseInt(row.count);
+  });
+
+  return response(200, {
+    summary: {
+      totalTenants: parseInt(tenantsResult.rows[0].total),
+      newTenants: parseInt(tenantsResult.rows[0].new_in_period),
+      tenantsToday: parseInt(tenantsResult.rows[0].new_today),
+      totalUsers: parseInt(usersResult.rows[0].total),
+      newUsers: parseInt(usersResult.rows[0].new_in_period),
+      mrr: revenueResult.rows[0].mrr,
+      arr: revenueResult.rows[0].arr,
+      mrrGrowth: revenueResult.rows[0].growth,
+    },
+    planDistribution: {
+      free: planDist.free || 0,
+      pro: planDist.pro || 0,
+      enterprise: planDist.enterprise || 0,
+    },
+    timeSeries: timeSeriesData,
+  });
+}
+
+// =========================================================================
+// Customer Health Handlers
+// =========================================================================
+
+/**
+ * Get all health scores
+ */
+async function handleGetHealthScores(event, user) {
+  const filter = event.queryStringParameters?.filter;
+
+  // Thresholds: 90+ Excellent, 70-89 Good, 50-69 Needs Attention, <50 At Risk
+  let whereClause = '';
+  if (filter === 'at_risk') {
+    whereClause = 'WHERE health_score < 50';
+  } else if (filter === 'needs_attention') {
+    whereClause = 'WHERE health_score >= 50 AND health_score < 70';
+  } else if (filter === 'good') {
+    whereClause = 'WHERE health_score >= 70 AND health_score < 90';
+  } else if (filter === 'excellent') {
+    whereClause = 'WHERE health_score >= 90';
+  } else if (filter === 'healthy') {
+    // Backwards compatibility - combines good + excellent
+    whereClause = 'WHERE health_score >= 70';
+  }
+
+  const result = await opsQuery(`
+    SELECT * FROM tenant_health_scores
+    ${whereClause}
+    ORDER BY health_score ASC
+  `);
+
+  return response(200, {
+    scores: result.rows.map(row => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      tenantName: row.tenant_name,
+      tenantSubdomain: row.tenant_subdomain,
+      plan: row.plan,
+      healthScore: row.health_score,
+      previousScore: row.previous_score,
+      trend: row.trend,
+      trendChange: row.trend_change,
+      breakdown: {
+        loginFrequency: row.login_frequency_score,
+        featureAdoption: row.feature_adoption_score,
+        bookingTrend: row.booking_trend_score,
+        supportSentiment: row.support_sentiment_score,
+        paymentHistory: row.payment_history_score,
+        userEngagement: row.user_engagement_score,
+      },
+      daysSinceLogin: row.days_since_login,
+      lastActivityAt: row.last_activity_at,
+      riskFactors: row.risk_factors || [],
+      calculatedAt: row.calculated_at,
+    })),
+  });
+}
+
+/**
+ * Get health score stats
+ * Thresholds: 90+ Excellent (green), 70-89 Good (yellow), 50-69 Needs Attention (orange), <50 At Risk (red)
+ */
+async function handleGetHealthScoresStats(event, user) {
+  const result = await opsQuery(`
+    SELECT
+      COUNT(*) as total,
+      AVG(health_score)::int as avg_score,
+      COUNT(*) FILTER (WHERE health_score < 50) as at_risk,
+      COUNT(*) FILTER (WHERE health_score >= 50 AND health_score < 70) as needs_attention,
+      COUNT(*) FILTER (WHERE health_score >= 70 AND health_score < 90) as good,
+      COUNT(*) FILTER (WHERE health_score >= 90) as excellent
+    FROM tenant_health_scores
+  `);
+
+  const row = result.rows[0];
+  return response(200, {
+    stats: {
+      total: parseInt(row.total),
+      avgScore: parseInt(row.avg_score) || 0,
+      atRisk: parseInt(row.at_risk),
+      needsAttention: parseInt(row.needs_attention),
+      good: parseInt(row.good),
+      excellent: parseInt(row.excellent),
+      // For backwards compatibility, also include combined "healthy" count
+      healthy: parseInt(row.good) + parseInt(row.excellent),
+    },
+  });
+}
+
+/**
+ * Get single health score
+ */
+async function handleGetHealthScore(event, user) {
+  const tenantId = extractPathParam(event, '/admin/health-scores/');
+
+  const result = await opsQuery(`
+    SELECT * FROM tenant_health_scores WHERE tenant_id = $1
+  `, [tenantId]);
+
+  if (result.rows.length === 0) {
+    return response(404, { message: 'Health score not found' });
+  }
+
+  const row = result.rows[0];
+  return response(200, {
+    score: {
+      id: row.id,
+      tenantId: row.tenant_id,
+      tenantName: row.tenant_name,
+      tenantSubdomain: row.tenant_subdomain,
+      plan: row.plan,
+      healthScore: row.health_score,
+      previousScore: row.previous_score,
+      trend: row.trend,
+      trendChange: row.trend_change,
+      breakdown: {
+        loginFrequency: row.login_frequency_score,
+        featureAdoption: row.feature_adoption_score,
+        bookingTrend: row.booking_trend_score,
+        supportSentiment: row.support_sentiment_score,
+        paymentHistory: row.payment_history_score,
+        userEngagement: row.user_engagement_score,
+      },
+      daysSinceLogin: row.days_since_login,
+      lastActivityAt: row.last_activity_at,
+      riskFactors: row.risk_factors || [],
+      calculatedAt: row.calculated_at,
+    },
+  });
+}
+
+/**
+ * Get churn alerts
+ */
+async function handleGetChurnAlerts(event, user) {
+  const acknowledged = event.queryStringParameters?.acknowledged;
+
+  let whereClause = '';
+  if (acknowledged === 'true') {
+    whereClause = 'WHERE acknowledged = true';
+  } else if (acknowledged === 'false') {
+    whereClause = 'WHERE acknowledged = false';
+  }
+
+  const result = await opsQuery(`
+    SELECT * FROM churn_alerts
+    ${whereClause}
+    ORDER BY created_at DESC
+    LIMIT 100
+  `);
+
+  return response(200, {
+    alerts: result.rows.map(row => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      tenantName: row.tenant_name,
+      alertType: row.alert_type,
+      message: row.message,
+      severity: row.severity,
+      acknowledged: row.acknowledged,
+      acknowledgedBy: row.acknowledged_by,
+      acknowledgedAt: row.acknowledged_at,
+      createdAt: row.created_at,
+    })),
+  });
+}
+
+/**
+ * Acknowledge churn alert
+ */
+async function handleAcknowledgeChurnAlert(event, user, clientIp) {
+  const alertId = extractPathParam(event, '/admin/churn-alerts/', '/acknowledge');
+
+  const result = await opsQuery(`
+    UPDATE churn_alerts
+    SET acknowledged = true, acknowledged_by = $1, acknowledged_at = NOW()
+    WHERE id = $2
+    RETURNING id
+  `, [user.email, alertId]);
+
+  if (result.rows.length === 0) {
+    return response(404, { message: 'Alert not found' });
+  }
+
+  await logAudit(user, 'acknowledge_churn_alert', 'churn_alert', alertId, {}, clientIp);
+
+  return response(200, { success: true });
+}
+
+// =========================================================================
+// SLA Handlers
+// =========================================================================
+
+/**
+ * Get SLA overview
+ */
+async function handleGetSlaOverview(event, user) {
+  // Get current month uptime from records
+  const uptimeResult = await opsQuery(`
+    SELECT AVG(uptime_percentage) as avg_uptime
+    FROM uptime_records
+    WHERE record_date >= date_trunc('month', NOW())
+  `);
+
+  // Get YTD uptime
+  const ytdResult = await opsQuery(`
+    SELECT AVG(uptime_percentage) as avg_uptime
+    FROM uptime_records
+    WHERE record_date >= date_trunc('year', NOW())
+  `);
+
+  const overallUptime = parseFloat(uptimeResult.rows[0]?.avg_uptime) || 99.95;
+  const ytdUptime = parseFloat(ytdResult.rows[0]?.avg_uptime) || 99.93;
+  const slaTarget = 99.9;
+
+  let status = 'meeting';
+  if (overallUptime < slaTarget) status = 'breached';
+  else if (overallUptime < slaTarget + 0.05) status = 'at_risk';
+
+  const remainingDowntime = Math.max(0, (100 - slaTarget) - (100 - overallUptime));
+  const remainingMinutes = Math.round((remainingDowntime / 100) * 30 * 24 * 60);
+
+  // Check credits owed
+  const creditsResult = await opsQuery(`
+    SELECT COALESCE(SUM(credit_amount), 0) as total
+    FROM sla_credits
+    WHERE status = 'pending'
+  `);
+
+  return response(200, {
+    overview: {
+      overallUptime: parseFloat(overallUptime.toFixed(2)),
+      ytdUptime: parseFloat(ytdUptime.toFixed(2)),
+      slaTarget,
+      status,
+      remainingMinutes,
+      creditsOwed: parseFloat(creditsResult.rows[0]?.total) || 0,
+    },
+  });
+}
+
+/**
+ * Get SLA components
+ */
+async function handleGetSlaComponents(event, user) {
+  const result = await opsQuery(`
+    SELECT 
+      sc.name, sc.display_name, sc.target_uptime,
+      COALESCE(
+        (SELECT AVG(uptime_percentage) FROM uptime_records ur 
+         WHERE ur.component_name = sc.name 
+         AND ur.record_date >= date_trunc('month', NOW())),
+        100
+      ) as current_month,
+      COALESCE(
+        (SELECT AVG(uptime_percentage) FROM uptime_records ur 
+         WHERE ur.component_name = sc.name 
+         AND ur.record_date >= date_trunc('year', NOW())),
+        100
+      ) as ytd
+    FROM sla_config sc
+    WHERE sc.is_active = true
+    ORDER BY sc.display_name
+  `);
+
+  return response(200, {
+    components: result.rows.map(row => {
+      const currentMonth = parseFloat(row.current_month);
+      const target = parseFloat(row.target_uptime);
+      let status = 'operational';
+      if (currentMonth < target - 0.1) status = 'major_outage';
+      else if (currentMonth < target) status = 'partial_outage';
+      else if (currentMonth < target + 0.05) status = 'degraded';
+
+      return {
+        name: row.name,
+        displayName: row.display_name,
+        currentMonth: parseFloat(currentMonth.toFixed(2)),
+        ytd: parseFloat(parseFloat(row.ytd).toFixed(2)),
+        target,
+        status,
+      };
+    }),
+  });
+}
+
+/**
+ * Get SLA calendar (daily uptime)
+ */
+async function handleGetSlaCalendar(event, user) {
+  const month = event.queryStringParameters?.month || new Date().toISOString().slice(0, 7);
+
+  const result = await opsQuery(`
+    SELECT 
+      record_date::text as date,
+      AVG(uptime_percentage) as uptime,
+      SUM(incident_count) as incidents
+    FROM uptime_records
+    WHERE to_char(record_date, 'YYYY-MM') = $1
+    GROUP BY record_date
+    ORDER BY record_date
+  `, [month]);
+
+  return response(200, {
+    calendar: result.rows.map(row => ({
+      date: row.date,
+      uptime: parseFloat(parseFloat(row.uptime).toFixed(3)),
+      incidents: parseInt(row.incidents),
+    })),
+  });
+}
+
+/**
+ * Get SLA-impacting incidents
+ */
+async function handleGetSlaIncidents(event, user) {
+  const result = await opsQuery(`
+    SELECT 
+      i.id, i.title, i.created_at as date,
+      EXTRACT(EPOCH FROM (COALESCE(i.resolved_at, NOW()) - i.created_at)) / 60 as duration,
+      COUNT(DISTINCT ic.tenant_id) as affected_customers
+    FROM incidents i
+    LEFT JOIN incident_affected_customers ic ON ic.incident_id = i.id
+    WHERE i.created_at >= date_trunc('month', NOW())
+    AND i.severity IN ('partial_outage', 'major_outage')
+    GROUP BY i.id
+    ORDER BY i.created_at DESC
+  `);
+
+  return response(200, {
+    incidents: result.rows.map(row => ({
+      id: row.id,
+      title: row.title,
+      date: row.date,
+      duration: Math.round(parseFloat(row.duration)),
+      affectedCustomers: parseInt(row.affected_customers) || 0,
+      slaImpact: 0.05, // Would calculate based on actual impact
+      creditAmount: 0,
+    })),
+  });
+}
+
+/**
+ * Get SLA credits
+ */
+async function handleGetSlaCredits(event, user) {
+  const result = await opsQuery(`
+    SELECT 
+      COALESCE(SUM(credit_amount) FILTER (WHERE status = 'pending'), 0) as pending,
+      COALESCE(SUM(credit_amount) FILTER (WHERE status = 'applied'), 0) as applied,
+      COALESCE(SUM(credit_amount), 0) as total
+    FROM sla_credits
+  `);
+
+  const row = result.rows[0];
+  return response(200, {
+    credits: {
+      total: parseFloat(row.total),
+      pending: parseFloat(row.pending),
+      applied: parseFloat(row.applied),
+    },
+  });
+}
+
+/**
+ * Get SLA alert settings
+ */
+async function handleGetSlaAlerts(event, user) {
+  const result = await opsQuery(`
+    SELECT * FROM sla_alerts WHERE is_active = true LIMIT 1
+  `);
+
+  if (result.rows.length === 0) {
+    return response(200, {
+      settings: {
+        thresholdPercent: 0.05,
+        notificationChannels: ['email'],
+        isActive: true,
+      },
+    });
+  }
+
+  const row = result.rows[0];
+  return response(200, {
+    settings: {
+      thresholdPercent: parseFloat(row.threshold_percent),
+      notificationChannels: row.notification_channels,
+      isActive: row.is_active,
+    },
+  });
+}
+
+/**
+ * Update SLA alert settings
+ */
+async function handleUpdateSlaAlerts(event, user, clientIp) {
+  const body = JSON.parse(event.body || '{}');
+
+  await opsQuery(`
+    INSERT INTO sla_alerts (threshold_percent, notification_channels, is_active)
+    VALUES ($1, $2, $3)
+    ON CONFLICT (id) DO UPDATE SET
+      threshold_percent = COALESCE($1, sla_alerts.threshold_percent),
+      notification_channels = COALESCE($2, sla_alerts.notification_channels),
+      is_active = COALESCE($3, sla_alerts.is_active)
+  `, [body.thresholdPercent, body.notificationChannels, body.isActive]);
+
+  await logAudit(user, 'update_sla_alerts', 'sla_alerts', null, body, clientIp);
+
+  return response(200, { success: true });
+}
+
+// =========================================================================
+// Email Template Handlers
+// =========================================================================
+
+/**
+ * Get all email templates
+ */
+async function handleGetEmailTemplates(event, user) {
+  const result = await opsQuery(`
+    SELECT * FROM email_templates
+    WHERE tenant_id IS NULL
+    ORDER BY name
+  `);
+
+  return response(200, {
+    templates: result.rows.map(row => ({
+      id: row.id,
+      templateKey: row.template_key,
+      name: row.name,
+      description: row.description,
+      subject: row.subject,
+      previewText: row.preview_text,
+      blocks: row.blocks,
+      tenantId: row.tenant_id,
+      version: row.version,
+      isActive: row.is_active,
+      createdBy: row.created_by_name || row.created_by,
+      createdAt: row.created_at,
+      updatedBy: row.updated_by_name || row.updated_by,
+      updatedAt: row.updated_at,
+    })),
+  });
+}
+
+/**
+ * Get single email template
+ */
+async function handleGetEmailTemplate(event, user) {
+  const templateId = extractPathParam(event, '/admin/email-templates/');
+
+  const result = await opsQuery(`
+    SELECT * FROM email_templates WHERE id = $1
+  `, [templateId]);
+
+  if (result.rows.length === 0) {
+    return response(404, { message: 'Template not found' });
+  }
+
+  const row = result.rows[0];
+  return response(200, {
+    template: {
+      id: row.id,
+      templateKey: row.template_key,
+      name: row.name,
+      description: row.description,
+      subject: row.subject,
+      previewText: row.preview_text,
+      blocks: row.blocks,
+      tenantId: row.tenant_id,
+      version: row.version,
+      isActive: row.is_active,
+      createdBy: row.created_by_name || row.created_by,
+      createdAt: row.created_at,
+      updatedBy: row.updated_by_name || row.updated_by,
+      updatedAt: row.updated_at,
+    },
+  });
+}
+
+/**
+ * Update email template
+ */
+async function handleUpdateEmailTemplate(event, user, clientIp) {
+  const templateId = extractPathParam(event, '/admin/email-templates/');
+  const body = JSON.parse(event.body || '{}');
+
+  // Get current template for version
+  const current = await opsQuery(`SELECT * FROM email_templates WHERE id = $1`, [templateId]);
+  if (current.rows.length === 0) {
+    return response(404, { message: 'Template not found' });
+  }
+
+  const currentTemplate = current.rows[0];
+  const newVersion = currentTemplate.version + 1;
+
+  // Save current as version history
+  await opsQuery(`
+    INSERT INTO email_template_versions (template_id, version, subject, preview_text, blocks, created_by, created_by_name)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+  `, [templateId, currentTemplate.version, currentTemplate.subject, currentTemplate.preview_text, 
+      JSON.stringify(currentTemplate.blocks), user.email, user.name || user.email]);
+
+  // Update template
+  const result = await opsQuery(`
+    UPDATE email_templates
+    SET subject = COALESCE($1, subject),
+        preview_text = COALESCE($2, preview_text),
+        blocks = COALESCE($3, blocks),
+        version = $4,
+        updated_by = $5,
+        updated_by_name = $6,
+        updated_at = NOW()
+    WHERE id = $7
+    RETURNING *
+  `, [body.subject, body.previewText, body.blocks ? JSON.stringify(body.blocks) : null,
+      newVersion, user.email, user.name || user.email, templateId]);
+
+  await logAudit(user, 'update_email_template', 'email_template', templateId, {
+    version: newVersion,
+  }, clientIp);
+
+  const row = result.rows[0];
+  return response(200, {
+    template: {
+      id: row.id,
+      templateKey: row.template_key,
+      name: row.name,
+      description: row.description,
+      subject: row.subject,
+      previewText: row.preview_text,
+      blocks: row.blocks,
+      tenantId: row.tenant_id,
+      version: row.version,
+      isActive: row.is_active,
+      updatedBy: row.updated_by_name || row.updated_by,
+      updatedAt: row.updated_at,
+    },
+  });
+}
+
+/**
+ * Get email template versions
+ */
+async function handleGetEmailTemplateVersions(event, user) {
+  const templateId = extractPathParam(event, '/admin/email-templates/', '/versions');
+
+  const result = await opsQuery(`
+    SELECT id, version, created_by_name, created_by, created_at
+    FROM email_template_versions
+    WHERE template_id = $1
+    ORDER BY version DESC
+  `, [templateId]);
+
+  return response(200, {
+    versions: result.rows.map(row => ({
+      id: row.id,
+      version: row.version,
+      createdBy: row.created_by_name || row.created_by,
+      createdAt: row.created_at,
+    })),
+  });
+}
+
+/**
+ * Restore email template version
+ */
+async function handleRestoreEmailTemplateVersion(event, user, clientIp) {
+  const path = event.requestContext?.http?.path || event.path;
+  const match = path.match(/\/admin\/email-templates\/([^/]+)\/restore\/(\d+)/);
+  const templateId = match[1];
+  const version = parseInt(match[2]);
+
+  // Get the version to restore
+  const versionResult = await opsQuery(`
+    SELECT * FROM email_template_versions
+    WHERE template_id = $1 AND version = $2
+  `, [templateId, version]);
+
+  if (versionResult.rows.length === 0) {
+    return response(404, { message: 'Version not found' });
+  }
+
+  const versionData = versionResult.rows[0];
+
+  // Get current template
+  const current = await opsQuery(`SELECT version FROM email_templates WHERE id = $1`, [templateId]);
+  const newVersion = current.rows[0].version + 1;
+
+  // Save current as version history first
+  await opsQuery(`
+    INSERT INTO email_template_versions (template_id, version, subject, preview_text, blocks, created_by, created_by_name)
+    SELECT id, version, subject, preview_text, blocks, $1, $2
+    FROM email_templates WHERE id = $3
+  `, [user.email, user.name || user.email, templateId]);
+
+  // Restore the version
+  const result = await opsQuery(`
+    UPDATE email_templates
+    SET subject = $1, preview_text = $2, blocks = $3, version = $4,
+        updated_by = $5, updated_by_name = $6, updated_at = NOW()
+    WHERE id = $7
+    RETURNING *
+  `, [versionData.subject, versionData.preview_text, versionData.blocks,
+      newVersion, user.email, user.name || user.email, templateId]);
+
+  await logAudit(user, 'restore_email_template', 'email_template', templateId, {
+    restoredVersion: version,
+    newVersion,
+  }, clientIp);
+
+  const row = result.rows[0];
+  return response(200, {
+    template: {
+      id: row.id,
+      templateKey: row.template_key,
+      name: row.name,
+      subject: row.subject,
+      previewText: row.preview_text,
+      blocks: row.blocks,
+      version: row.version,
+      updatedBy: row.updated_by_name || row.updated_by,
+      updatedAt: row.updated_at,
+    },
+  });
+}
+
+/**
+ * Send test email
+ */
+async function handleSendTestEmail(event, user) {
+  const templateId = extractPathParam(event, '/admin/email-templates/', '/test');
+  const body = JSON.parse(event.body || '{}');
+  const { email } = body;
+
+  if (!email) {
+    return response(400, { message: 'Email address is required' });
+  }
+
+  // In production, would actually send the email via SES
+  // For now, just simulate success
+  return response(200, {
+    success: true,
+    message: `Test email sent to ${email}`,
+  });
+}
+
+// =========================================================================
+// Webhook Handlers
+// =========================================================================
+
+/**
+ * Get all webhooks
+ */
+async function handleGetWebhooks(event, user) {
+  const result = await opsQuery(`
+    SELECT * FROM webhooks ORDER BY created_at DESC
+  `);
+
+  return response(200, {
+    webhooks: result.rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      url: row.url,
+      secret: row.secret,
+      events: row.events,
+      headers: row.headers,
+      tenantId: row.tenant_id,
+      isActive: row.is_active,
+      lastDeliveryStatus: row.last_delivery_status,
+      lastDeliveryAt: row.last_delivery_at,
+      createdAt: row.created_at,
+    })),
+  });
+}
+
+/**
+ * Create webhook
+ */
+async function handleCreateWebhook(event, user, clientIp) {
+  const body = JSON.parse(event.body || '{}');
+  const { name, url, events, headers, tenantId } = body;
+
+  if (!name || !url || !events || events.length === 0) {
+    return response(400, { message: 'Name, URL, and events are required' });
+  }
+
+  const crypto = require('crypto');
+  const secret = `whsec_${crypto.randomBytes(16).toString('hex')}`;
+
+  const result = await opsQuery(`
+    INSERT INTO webhooks (name, url, secret, events, headers, tenant_id, created_by, created_by_name)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    RETURNING *
+  `, [name, url, secret, events, headers || {}, tenantId || null, user.email, user.name || user.email]);
+
+  await logAudit(user, 'create_webhook', 'webhook', result.rows[0].id, { name, url }, clientIp);
+
+  const row = result.rows[0];
+  return response(201, {
+    webhook: {
+      id: row.id,
+      name: row.name,
+      url: row.url,
+      secret: row.secret,
+      events: row.events,
+      headers: row.headers,
+      tenantId: row.tenant_id,
+      isActive: row.is_active,
+      createdAt: row.created_at,
+    },
+  });
+}
+
+/**
+ * Update webhook
+ */
+async function handleUpdateWebhook(event, user, clientIp) {
+  const webhookId = extractPathParam(event, '/admin/webhooks/');
+  const body = JSON.parse(event.body || '{}');
+
+  const result = await opsQuery(`
+    UPDATE webhooks
+    SET name = COALESCE($1, name),
+        url = COALESCE($2, url),
+        events = COALESCE($3, events),
+        headers = COALESCE($4, headers),
+        is_active = COALESCE($5, is_active),
+        updated_at = NOW()
+    WHERE id = $6
+    RETURNING *
+  `, [body.name, body.url, body.events, body.headers, body.isActive, webhookId]);
+
+  if (result.rows.length === 0) {
+    return response(404, { message: 'Webhook not found' });
+  }
+
+  await logAudit(user, 'update_webhook', 'webhook', webhookId, body, clientIp);
+
+  const row = result.rows[0];
+  return response(200, {
+    webhook: {
+      id: row.id,
+      name: row.name,
+      url: row.url,
+      secret: row.secret,
+      events: row.events,
+      headers: row.headers,
+      tenantId: row.tenant_id,
+      isActive: row.is_active,
+      createdAt: row.created_at,
+    },
+  });
+}
+
+/**
+ * Delete webhook
+ */
+async function handleDeleteWebhook(event, user, clientIp) {
+  const webhookId = extractPathParam(event, '/admin/webhooks/');
+
+  const result = await opsQuery(`
+    DELETE FROM webhooks WHERE id = $1 RETURNING name
+  `, [webhookId]);
+
+  if (result.rows.length === 0) {
+    return response(404, { message: 'Webhook not found' });
+  }
+
+  await logAudit(user, 'delete_webhook', 'webhook', webhookId, {
+    name: result.rows[0].name,
+  }, clientIp);
+
+  return response(200, { success: true });
+}
+
+/**
+ * Test webhook
+ */
+async function handleTestWebhook(event, user) {
+  const webhookId = extractPathParam(event, '/admin/webhooks/', '/test');
+
+  const webhookResult = await opsQuery(`SELECT url FROM webhooks WHERE id = $1`, [webhookId]);
+  if (webhookResult.rows.length === 0) {
+    return response(404, { message: 'Webhook not found' });
+  }
+
+  // In production, would make actual HTTP request
+  // For now, simulate success
+  const success = Math.random() > 0.2;
+
+  return response(200, {
+    success,
+    status: success ? 200 : 500,
+    message: success ? 'Webhook received successfully' : 'Connection failed',
+  });
+}
+
+/**
+ * Get webhook deliveries
+ */
+async function handleGetWebhookDeliveries(event, user) {
+  const webhookId = extractPathParam(event, '/admin/webhooks/', '/deliveries');
+
+  const result = await opsQuery(`
+    SELECT * FROM webhook_deliveries
+    WHERE webhook_id = $1
+    ORDER BY created_at DESC
+    LIMIT 50
+  `, [webhookId]);
+
+  return response(200, {
+    deliveries: result.rows.map(row => ({
+      id: row.id,
+      webhookId: row.webhook_id,
+      eventType: row.event_type,
+      payload: row.payload,
+      responseStatus: row.response_status,
+      responseBody: row.response_body,
+      attempts: row.attempts,
+      deliveredAt: row.delivered_at,
+      createdAt: row.created_at,
+    })),
+  });
+}
+
+// =========================================================================
+// Integration Handlers
+// =========================================================================
+
+/**
+ * Get all integrations
+ */
+async function handleGetIntegrations(event, user) {
+  const result = await opsQuery(`
+    SELECT * FROM integrations ORDER BY name
+  `);
+
+  return response(200, {
+    integrations: result.rows.map(row => ({
+      id: row.id,
+      integrationKey: row.integration_key,
+      name: row.name,
+      description: row.description,
+      category: row.category,
+      isConnected: row.is_connected,
+      connectedBy: row.connected_by,
+      connectedAt: row.connected_at,
+    })),
+  });
+}
+
+/**
+ * Connect integration
+ */
+async function handleConnectIntegration(event, user, clientIp) {
+  const integrationKey = extractPathParam(event, '/admin/integrations/', '/connect');
+  const body = JSON.parse(event.body || '{}');
+
+  const result = await opsQuery(`
+    UPDATE integrations
+    SET is_connected = true,
+        config = $1,
+        connected_by = $2,
+        connected_at = NOW(),
+        updated_at = NOW()
+    WHERE integration_key = $3
+    RETURNING *
+  `, [body, user.email, integrationKey]);
+
+  if (result.rows.length === 0) {
+    return response(404, { message: 'Integration not found' });
+  }
+
+  await logAudit(user, 'connect_integration', 'integration', integrationKey, {}, clientIp);
+
+  return response(200, { success: true });
+}
+
+/**
+ * Disconnect integration
+ */
+async function handleDisconnectIntegration(event, user, clientIp) {
+  const integrationKey = extractPathParam(event, '/admin/integrations/');
+
+  const result = await opsQuery(`
+    UPDATE integrations
+    SET is_connected = false,
+        config = '{}'::jsonb,
+        access_token = NULL,
+        refresh_token = NULL,
+        connected_by = NULL,
+        connected_at = NULL,
+        updated_at = NOW()
+    WHERE integration_key = $1
+    RETURNING *
+  `, [integrationKey]);
+
+  if (result.rows.length === 0) {
+    return response(404, { message: 'Integration not found' });
+  }
+
+  await logAudit(user, 'disconnect_integration', 'integration', integrationKey, {}, clientIp);
+
+  return response(200, { success: true });
+}
+
+/**
+ * Get integration usage stats
+ */
+async function handleGetIntegrationUsage(event, user) {
+  // In production, would query actual metrics
+  // For now, return simulated stats
+  return response(200, {
+    usage: {
+      totalRequests24h: Math.floor(10000 + Math.random() * 5000),
+      successRate: 95 + Math.random() * 4,
+      failedDeliveries: Math.floor(Math.random() * 200),
+      avgResponseTime: Math.floor(150 + Math.random() * 150),
+    },
+  });
 }

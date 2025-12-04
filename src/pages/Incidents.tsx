@@ -75,19 +75,36 @@ const SERVICES = [
   'Admin Portal',
 ];
 
-const SEVERITY_CONFIG = {
+const SEVERITY_CONFIG: Record<string, { color: string; bg: string; icon: string; label: string }> = {
   critical: { color: 'var(--color-error)', bg: 'var(--color-error-soft)', icon: '🔴', label: 'Critical' },
   major: { color: '#f97316', bg: 'rgba(249, 115, 22, 0.1)', icon: '🟠', label: 'Major' },
   minor: { color: 'var(--color-warning)', bg: 'var(--color-warning-soft)', icon: '🟡', label: 'Minor' },
   low: { color: 'var(--color-brand)', bg: 'var(--color-brand-soft)', icon: '🔵', label: 'Low' },
+  // Legacy severity values (for backwards compatibility with existing data)
+  major_outage: { color: 'var(--color-error)', bg: 'var(--color-error-soft)', icon: '🔴', label: 'Major Outage' },
+  partial_outage: { color: '#f97316', bg: 'rgba(249, 115, 22, 0.1)', icon: '🟠', label: 'Partial Outage' },
+  degraded: { color: 'var(--color-warning)', bg: 'var(--color-warning-soft)', icon: '🟡', label: 'Degraded' },
 };
 
-const STATUS_CONFIG = {
+const DEFAULT_SEVERITY = { color: 'var(--color-brand)', bg: 'var(--color-brand-soft)', icon: '⚙️', label: 'Unknown' };
+
+const STATUS_CONFIG: Record<string, { color: string; icon: typeof AlertCircle; label: string }> = {
   investigating: { color: 'var(--color-error)', icon: AlertCircle, label: 'Investigating' },
   identified: { color: '#f97316', icon: Circle, label: 'Identified' },
   monitoring: { color: 'var(--color-warning)', icon: Activity, label: 'Monitoring' },
   resolved: { color: 'var(--color-success)', icon: CheckCircle2, label: 'Resolved' },
 };
+
+const DEFAULT_STATUS = { color: 'var(--text-muted)', icon: Circle, label: 'Unknown' };
+
+// Safe lookup helpers
+function getSeverityConfig(severity: string | undefined) {
+  return severity && SEVERITY_CONFIG[severity] ? SEVERITY_CONFIG[severity] : DEFAULT_SEVERITY;
+}
+
+function getStatusConfig(status: string | undefined) {
+  return status && STATUS_CONFIG[status] ? STATUS_CONFIG[status] : DEFAULT_STATUS;
+}
 
 const UPDATE_TYPE_LABELS: Record<IncidentUpdateType, string> = {
   status_change: 'Status Change',
@@ -191,8 +208,8 @@ function IncidentCard({
   isSelected: boolean;
   onClick: () => void;
 }) {
-  const severity = SEVERITY_CONFIG[incident.severity];
-  const status = STATUS_CONFIG[incident.status];
+  const severity = getSeverityConfig(incident.severity);
+  const status = getStatusConfig(incident.status);
   const StatusIcon = status.icon;
 
   return (
@@ -244,8 +261,15 @@ function StatusDropdown({
   disabled?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const config = STATUS_CONFIG[value];
+  const config = getStatusConfig(value);
   const StatusIcon = config.icon;
+
+  const handleStatusSelect = (status: IncidentStatus) => {
+    if (status !== value) {
+      onChange(status);
+    }
+    setIsOpen(false);
+  };
 
   return (
     <div className="relative">
@@ -269,10 +293,7 @@ function StatusDropdown({
               return (
                 <button
                   key={status}
-                  onClick={() => {
-                    onChange(status);
-                    setIsOpen(false);
-                  }}
+                  onClick={() => handleStatusSelect(status)}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-[var(--bg-tertiary)] transition-colors"
                   style={{ color: cfg.color }}
                 >
@@ -299,7 +320,7 @@ function SeverityDropdown({
   disabled?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const config = SEVERITY_CONFIG[value];
+  const config = getSeverityConfig(value);
 
   return (
     <div className="relative">
@@ -316,7 +337,7 @@ function SeverityDropdown({
         <>
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
           <div className="absolute top-full left-0 mt-1 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg shadow-lg z-20 py-1 min-w-[120px]">
-            {(Object.keys(SEVERITY_CONFIG) as IncidentSeverity[]).map((severity) => {
+            {(['critical', 'major', 'minor', 'low'] as IncidentSeverity[]).map((severity) => {
               const cfg = SEVERITY_CONFIG[severity];
               return (
                 <button
@@ -341,7 +362,7 @@ function SeverityDropdown({
 
 // TimelineEntry Component
 function TimelineEntry({ update, isLast }: { update: IncidentUpdate; isLast: boolean }) {
-  const status = update.newStatus ? STATUS_CONFIG[update.newStatus] : null;
+  const status = update.newStatus ? getStatusConfig(update.newStatus) : null;
   const Icon = status?.icon || Circle;
 
   return (
@@ -520,8 +541,15 @@ function AffectedTab({ incidentId }: { incidentId: string }) {
     );
   }
 
+  // Safely extract affected list - API might return { data: [...] } or just [...]
+  const affectedList = Array.isArray(affected)
+    ? affected
+    : Array.isArray((affected as { data?: unknown[] })?.data)
+      ? (affected as { data: typeof affected }).data
+      : [];
+
   const tenants = tenantsData?.tenants || [];
-  const affectedIds = new Set((affected || []).map((a) => a.tenantId));
+  const affectedIds = new Set(affectedList.map((a) => a.tenantId));
   const availableTenants = tenants.filter((t) => !affectedIds.has(t.id));
 
   return (
@@ -535,7 +563,7 @@ function AffectedTab({ incidentId }: { incidentId: string }) {
           <Plus size={14} />
           Add Customer
         </button>
-        {affected && affected.length > 0 && (
+        {affectedList.length > 0 && (
           <button
             onClick={handleNotify}
             disabled={notifyAffected.isPending}
@@ -589,9 +617,9 @@ function AffectedTab({ incidentId }: { incidentId: string }) {
       )}
 
       {/* Affected List */}
-      {affected && affected.length > 0 ? (
+      {affectedList.length > 0 ? (
         <div className="space-y-2">
-          {affected.map((customer) => (
+          {affectedList.map((customer) => (
             <div
               key={customer.id}
               className="flex items-center justify-between p-3 bg-[var(--bg-tertiary)] rounded-lg"
@@ -946,7 +974,7 @@ function IncidentDetailPanel({
   incidentId: string;
   onClose: () => void;
 }) {
-  const { data: incident, isLoading } = useIncident(incidentId);
+  const { data, isLoading } = useIncident(incidentId);
   const updateIncident = useUpdateIncident(incidentId);
   const deleteIncident = useDeleteIncident();
   const [activeTab, setActiveTab] = useState<'timeline' | 'affected' | 'postmortem'>('timeline');
@@ -966,6 +994,9 @@ function IncidentDetailPanel({
     }
   };
 
+  // API returns { incident: {...} }, extract the incident object
+  const incident = data?.incident;
+
   if (isLoading || !incident) {
     return (
       <div className="w-[480px] border-l border-[var(--border-primary)] bg-[var(--bg-secondary)] flex items-center justify-center">
@@ -974,7 +1005,7 @@ function IncidentDetailPanel({
     );
   }
 
-  const severity = SEVERITY_CONFIG[incident.severity];
+  const severity = getSeverityConfig(incident.severity);
 
   return (
     <div className="w-[480px] border-l border-[var(--border-primary)] bg-[var(--bg-secondary)] flex flex-col h-full overflow-hidden">
@@ -1146,7 +1177,7 @@ function CreateIncidentPanel({
                   onChange={(e) => setForm({ ...form, severity: e.target.value as IncidentSeverity })}
                   className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg text-sm text-[var(--text-primary)]"
                 >
-                  {(Object.keys(SEVERITY_CONFIG) as IncidentSeverity[]).map((sev) => (
+                  {(['critical', 'major', 'minor', 'low'] as IncidentSeverity[]).map((sev) => (
                     <option key={sev} value={sev}>
                       {SEVERITY_CONFIG[sev].icon} {SEVERITY_CONFIG[sev].label}
                     </option>
@@ -1327,7 +1358,7 @@ export function Incidents() {
               className="px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg text-sm text-[var(--text-primary)]"
             >
               <option value="">All Severities</option>
-              {(Object.keys(SEVERITY_CONFIG) as IncidentSeverity[]).map((sev) => (
+              {(['critical', 'major', 'minor', 'low'] as IncidentSeverity[]).map((sev) => (
                 <option key={sev} value={sev}>
                   {SEVERITY_CONFIG[sev].icon} {SEVERITY_CONFIG[sev].label}
                 </option>

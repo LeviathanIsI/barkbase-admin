@@ -22,6 +22,10 @@ import type {
   KillFlagInput,
   OpsSettings,
   UpdateWhiteLabelInput,
+  SLAAlertSettings,
+  UpdateEmailTemplateInput,
+  CreateWebhookInput,
+  UpdateWebhookInput,
 } from '@/types';
 
 // Query keys
@@ -68,6 +72,29 @@ export const queryKeys = {
   whiteLabelTenants: ['white-label', 'tenants'] as const,
   whiteLabelBranding: (tenantId: string) => ['white-label', 'branding', tenantId] as const,
   whiteLabelHistory: (tenantId: string) => ['white-label', 'history', tenantId] as const,
+  // Customer Health keys
+  healthScores: (filter?: string) => ['health-scores', filter] as const,
+  healthScoresStats: ['health-scores', 'stats'] as const,
+  healthScore: (tenantId: string) => ['health-score', tenantId] as const,
+  churnAlerts: (acknowledged?: boolean) => ['churn-alerts', acknowledged] as const,
+  // SLA keys
+  slaOverview: ['sla', 'overview'] as const,
+  slaComponents: ['sla', 'components'] as const,
+  slaCalendar: (month?: string) => ['sla', 'calendar', month] as const,
+  slaIncidents: ['sla', 'incidents'] as const,
+  slaCredits: ['sla', 'credits'] as const,
+  slaAlerts: ['sla', 'alerts'] as const,
+  // Email Template keys
+  emailTemplates: ['email-templates'] as const,
+  emailTemplate: (id: string) => ['email-template', id] as const,
+  emailTemplateVersions: (id: string) => ['email-template', id, 'versions'] as const,
+  // Webhook keys
+  webhooks: ['webhooks'] as const,
+  webhook: (id: string) => ['webhook', id] as const,
+  webhookDeliveries: (id: string) => ['webhook', id, 'deliveries'] as const,
+  // Integration keys
+  integrations: ['integrations'] as const,
+  integrationUsage: ['integrations', 'usage'] as const,
 };
 
 // Support hooks
@@ -942,5 +969,270 @@ export function useVerifyWhiteLabelDomain(tenantId: string) {
       queryClient.invalidateQueries({ queryKey: queryKeys.whiteLabelStats });
       queryClient.invalidateQueries({ queryKey: queryKeys.whiteLabelHistory(tenantId) });
     },
+  });
+}
+
+// =========================================================================
+// Customer Health hooks
+// =========================================================================
+
+export function useHealthScores(filter?: string) {
+  return useQuery({
+    queryKey: queryKeys.healthScores(filter),
+    queryFn: () => api.getHealthScores({ filter }),
+    staleTime: 30000,
+  });
+}
+
+export function useHealthScoresStats() {
+  return useQuery({
+    queryKey: queryKeys.healthScoresStats,
+    queryFn: () => api.getHealthScoresStats(),
+    staleTime: 60000,
+  });
+}
+
+export function useHealthScore(tenantId: string) {
+  return useQuery({
+    queryKey: queryKeys.healthScore(tenantId),
+    queryFn: () => api.getHealthScore(tenantId),
+    enabled: !!tenantId,
+  });
+}
+
+export function useChurnAlerts(acknowledged?: boolean) {
+  return useQuery({
+    queryKey: queryKeys.churnAlerts(acknowledged),
+    queryFn: () => api.getChurnAlerts({ acknowledged }),
+    staleTime: 30000,
+  });
+}
+
+export function useAcknowledgeChurnAlert() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.acknowledgeChurnAlert(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['churn-alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['health-scores'] });
+    },
+  });
+}
+
+// =========================================================================
+// SLA hooks
+// =========================================================================
+
+export function useSlaOverview() {
+  return useQuery({
+    queryKey: queryKeys.slaOverview,
+    queryFn: () => api.getSlaOverview(),
+    staleTime: 60000,
+  });
+}
+
+export function useSlaComponents() {
+  return useQuery({
+    queryKey: queryKeys.slaComponents,
+    queryFn: () => api.getSlaComponents(),
+    staleTime: 60000,
+  });
+}
+
+export function useSlaCalendar(month?: string) {
+  return useQuery({
+    queryKey: queryKeys.slaCalendar(month),
+    queryFn: () => api.getSlaCalendar(month),
+    staleTime: 60000,
+  });
+}
+
+export function useSlaIncidents() {
+  return useQuery({
+    queryKey: queryKeys.slaIncidents,
+    queryFn: () => api.getSlaIncidents(),
+    staleTime: 60000,
+  });
+}
+
+export function useSlaCredits() {
+  return useQuery({
+    queryKey: queryKeys.slaCredits,
+    queryFn: () => api.getSlaCredits(),
+    staleTime: 60000,
+  });
+}
+
+export function useSlaAlerts() {
+  return useQuery({
+    queryKey: queryKeys.slaAlerts,
+    queryFn: () => api.getSlaAlerts(),
+    staleTime: 60000,
+  });
+}
+
+export function useUpdateSlaAlerts() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (settings: Partial<SLAAlertSettings>) => api.updateSlaAlerts(settings),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.slaAlerts });
+    },
+  });
+}
+
+// =========================================================================
+// Email Template hooks
+// =========================================================================
+
+export function useEmailTemplates() {
+  return useQuery({
+    queryKey: queryKeys.emailTemplates,
+    queryFn: () => api.getEmailTemplates(),
+    staleTime: 60000,
+  });
+}
+
+export function useEmailTemplate(id: string) {
+  return useQuery({
+    queryKey: queryKeys.emailTemplate(id),
+    queryFn: () => api.getEmailTemplate(id),
+    enabled: !!id,
+  });
+}
+
+export function useUpdateEmailTemplate(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: UpdateEmailTemplateInput) => api.updateEmailTemplate(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.emailTemplate(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.emailTemplates });
+      queryClient.invalidateQueries({ queryKey: queryKeys.emailTemplateVersions(id) });
+    },
+  });
+}
+
+export function useEmailTemplateVersions(id: string) {
+  return useQuery({
+    queryKey: queryKeys.emailTemplateVersions(id),
+    queryFn: () => api.getEmailTemplateVersions(id),
+    enabled: !!id,
+  });
+}
+
+export function useRestoreEmailTemplateVersion(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (version: number) => api.restoreEmailTemplateVersion(id, version),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.emailTemplate(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.emailTemplates });
+      queryClient.invalidateQueries({ queryKey: queryKeys.emailTemplateVersions(id) });
+    },
+  });
+}
+
+export function useSendTestEmail(id: string) {
+  return useMutation({
+    mutationFn: (email: string) => api.sendTestEmail(id, email),
+  });
+}
+
+// =========================================================================
+// Webhook hooks
+// =========================================================================
+
+export function useWebhooks() {
+  return useQuery({
+    queryKey: queryKeys.webhooks,
+    queryFn: () => api.getWebhooks(),
+    staleTime: 30000,
+  });
+}
+
+export function useCreateWebhook() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateWebhookInput) => api.createWebhook(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.webhooks });
+    },
+  });
+}
+
+export function useUpdateWebhook(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: UpdateWebhookInput) => api.updateWebhook(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.webhooks });
+      queryClient.invalidateQueries({ queryKey: queryKeys.webhook(id) });
+    },
+  });
+}
+
+export function useDeleteWebhook() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteWebhook(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.webhooks });
+    },
+  });
+}
+
+export function useTestWebhook(id: string) {
+  return useMutation({
+    mutationFn: () => api.testWebhook(id),
+  });
+}
+
+export function useWebhookDeliveries(id: string) {
+  return useQuery({
+    queryKey: queryKeys.webhookDeliveries(id),
+    queryFn: () => api.getWebhookDeliveries(id),
+    enabled: !!id,
+    staleTime: 30000,
+  });
+}
+
+// =========================================================================
+// Integration hooks
+// =========================================================================
+
+export function useIntegrations() {
+  return useQuery({
+    queryKey: queryKeys.integrations,
+    queryFn: () => api.getIntegrations(),
+    staleTime: 60000,
+  });
+}
+
+export function useConnectIntegration() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, config }: { key: string; config: Record<string, unknown> }) => api.connectIntegration(key, config),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.integrations });
+    },
+  });
+}
+
+export function useDisconnectIntegration() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (key: string) => api.disconnectIntegration(key),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.integrations });
+    },
+  });
+}
+
+export function useIntegrationUsage() {
+  return useQuery({
+    queryKey: queryKeys.integrationUsage,
+    queryFn: () => api.getIntegrationUsage(),
+    staleTime: 60000,
   });
 }

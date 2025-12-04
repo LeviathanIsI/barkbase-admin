@@ -426,16 +426,16 @@ function ServiceCard({ service, onExpand }: { service: CommandCenterService; onE
       onClick={onExpand}
       className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-4 text-left hover:border-[var(--border-secondary)] transition-colors w-full"
     >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           <div
-            className="w-2.5 h-2.5 rounded-full"
+            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
             style={{ backgroundColor: statusConfig.color }}
           />
-          <span className="text-sm font-medium text-[var(--text-primary)]">{service.name}</span>
+          <span className="text-sm font-medium text-[var(--text-primary)] truncate" title={service.name}>{service.name}</span>
         </div>
         <span
-          className="text-xs px-2 py-0.5 rounded-full"
+          className="text-xs px-2 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap"
           style={{ backgroundColor: statusConfig.bg, color: statusConfig.color }}
         >
           {service.status.toUpperCase()}
@@ -1225,7 +1225,8 @@ function ApiTrafficChart() {
 // Tenant Activity Heatmap
 // ============================================================================
 
-function formatHourLabel(hourString: string): string {
+function formatHourLabel(hourString: string | undefined | null): string {
+  if (!hourString) return '-';
   // Handle ISO timestamps like "2025-12-02T22:00:00.000Z"
   if (hourString.includes('T')) {
     const date = new Date(hourString);
@@ -1235,7 +1236,8 @@ function formatHourLabel(hourString: string): string {
   return hourString;
 }
 
-function formatHourTooltip(hourString: string): string {
+function formatHourTooltip(hourString: string | undefined | null): string {
+  if (!hourString) return '-';
   if (hourString.includes('T')) {
     const date = new Date(hourString);
     return date.toLocaleTimeString('en-US', {
@@ -1291,7 +1293,7 @@ function TenantActivityHeatmap() {
           <div>
             <span className="text-[var(--text-muted)]">Peak: </span>
             <span className="text-[var(--text-primary)] font-medium">
-              {data.peakHour.users} @ {formatHourLabel(data.peakHour.hour)}
+              {data.peakHour?.users ?? 0} @ {formatHourLabel(data.peakHour?.hour)}
             </span>
           </div>
           <div>
@@ -1305,7 +1307,7 @@ function TenantActivityHeatmap() {
         <div className="flex items-end gap-0.5 h-12">
           {data.hourlyActivity.map((hour, idx) => {
             const intensity = hour.activeUsers / maxUsers;
-            const isPeak = hour.hour === data.peakHour.hour;
+            const isPeak = data.peakHour && hour.hour === data.peakHour.hour;
             const showLabel = idx === 0 || idx === totalHours - 1 || idx % labelInterval === 0;
 
             return (

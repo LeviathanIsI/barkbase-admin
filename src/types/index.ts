@@ -14,18 +14,23 @@ export interface AuthState {
   isLoading: boolean;
 }
 
+// Subscription status types
+export type SubscriptionStatus = 'active' | 'trial' | 'churned' | 'suspended';
+
 // Tenant and User types (from BarkBase)
 export interface Tenant {
   id: string;
   name: string;
   subdomain: string;
-  status: 'active' | 'inactive' | 'suspended' | 'trial';
+  status: SubscriptionStatus;
   createdAt: string;
   userCount?: number;
   petCount?: number;
   bookingCount?: number;
   plan?: string;
   trialEndsAt?: string;
+  lastActivityAt?: string;      // Track when tenant was last active
+  daysSinceActivity?: number;   // Computed days since last activity
 }
 
 export interface TenantUser {
@@ -41,9 +46,10 @@ export interface TenantUser {
 export interface TenantStats {
   totalPets: number;
   totalBookings: number;
-  totalRevenue: number;
+  totalRevenue: number | null;      // null = no Stripe connected, 0 = connected but zero revenue
   bookingsThisMonth: number;
   activeUsers: number;
+  stripeConnected?: boolean;         // Whether Stripe is connected
 }
 
 export interface TenantActivity {
@@ -1310,13 +1316,43 @@ export interface CustomerOwner {
   name: string;
 }
 
+export interface FeatureUsage {
+  feature: string;
+  usagePercent: number;  // 0-100
+  trend: 'up' | 'down' | 'stable';
+  lastUsed?: string;
+}
+
 export interface CustomerStats {
   userCount: number;
   petCount: number;
   bookingCount: number;
-  totalRevenue: number;
+  totalRevenue: number | null;
   activeUsers: number;
   ticketCount: number;
+  stripeConnected?: boolean;
+  featureUsage?: FeatureUsage[];  // Feature adoption data
+}
+
+export type CustomerAlertSeverity = 'critical' | 'warning' | 'info';
+export type CustomerAlertType = 'payment_failed' | 'account_suspended' | 'trial_expiring' | 'low_engagement' | 'feature_available' | 'billing_issue' | 'usage_limit' | 'security';
+
+export interface CustomerAlert {
+  id: string;
+  severity: CustomerAlertSeverity;
+  type: CustomerAlertType;
+  title: string;
+  message: string;
+  createdAt: string;
+  actionUrl?: string;
+  actionLabel?: string;
+}
+
+export interface HealthScoreBreakdown {
+  activity: number;      // 25% weight - Login frequency, sessions
+  payment: number;       // 25% weight - Billing health, on-time payments
+  engagement: number;    // 25% weight - Feature usage, bookings
+  support: number;       // 25% weight - Ticket sentiment, resolution rate
 }
 
 export interface CustomerProfile {
@@ -1332,9 +1368,11 @@ export interface CustomerProfile {
   owner: CustomerOwner;
   stats: CustomerStats;
   healthScore: number;
+  healthScoreBreakdown?: HealthScoreBreakdown;  // Breakdown by category
   lastActivity?: string;
   flags: CustomerFlags;
   recentActivity: CustomerActivity[];
+  alerts?: CustomerAlert[];  // Active alerts for this customer
 }
 
 export interface CustomerActivity {
@@ -1501,4 +1539,228 @@ export interface UpdateWhiteLabelInput {
     secondary: string;
     background: string;
   } | null;
+}
+
+// =========================================================================
+// Customer Health Types
+// =========================================================================
+
+export type HealthTrend = 'up' | 'down' | 'stable';
+export type ChurnAlertType = 'score_drop' | 'no_login' | 'payment_failed' | 'feature_decline' | 'support_negative';
+export type ChurnAlertSeverity = 'info' | 'warning' | 'critical';
+
+export interface HealthScoreBreakdown {
+  loginFrequency: number;
+  featureAdoption: number;
+  bookingTrend: number;
+  supportSentiment: number;
+  paymentHistory: number;
+  userEngagement: number;
+}
+
+export interface TenantHealthScore {
+  id: string;
+  tenantId: string;
+  tenantName: string;
+  tenantSubdomain: string;
+  plan: string;
+  healthScore: number;
+  previousScore?: number;
+  trend: HealthTrend;
+  trendChange: number;
+  breakdown: HealthScoreBreakdown;
+  daysSinceLogin: number;
+  lastActivityAt?: string;
+  riskFactors: string[];
+  calculatedAt: string;
+}
+
+export interface HealthScoreStats {
+  avgScore: number;
+  atRisk: number;        // <50 - Critical
+  needsAttention: number; // 50-69 - Orange
+  good: number;           // 70-89 - Yellow/Gold
+  excellent: number;      // 90+ - Green
+  healthy: number;        // Combined good + excellent for backwards compatibility
+  total: number;
+}
+
+export interface ChurnAlert {
+  id: string;
+  tenantId: string;
+  tenantName: string;
+  alertType: ChurnAlertType;
+  message: string;
+  severity: ChurnAlertSeverity;
+  acknowledged: boolean;
+  acknowledgedBy?: string;
+  acknowledgedAt?: string;
+  createdAt: string;
+}
+
+// =========================================================================
+// SLA Types
+// =========================================================================
+
+export type SLAStatus = 'meeting' | 'at_risk' | 'breached';
+export type ComponentStatus = 'operational' | 'degraded' | 'partial_outage' | 'major_outage';
+
+export interface SLAComponent {
+  name: string;
+  displayName: string;
+  currentMonth: number;
+  ytd: number;
+  target: number;
+  status: ComponentStatus;
+}
+
+export interface SLAOverview {
+  overallUptime: number;
+  ytdUptime: number;
+  slaTarget: number;
+  status: SLAStatus;
+  remainingMinutes: number;
+  creditsOwed: number;
+}
+
+export interface DayUptime {
+  date: string;
+  uptime: number;
+  incidents: number;
+}
+
+export interface SLAIncidentImpact {
+  id: string;
+  title: string;
+  date: string;
+  duration: number;
+  affectedCustomers: number;
+  slaImpact: number;
+  creditAmount: number;
+}
+
+export interface SLAAlertSettings {
+  thresholdPercent: number;
+  notificationChannels: string[];
+  isActive: boolean;
+}
+
+// =========================================================================
+// Email Template Types
+// =========================================================================
+
+export type EmailBlockType = 'header' | 'text' | 'button' | 'image' | 'divider' | 'footer';
+
+export interface EmailBlock {
+  id: string;
+  type: EmailBlockType;
+  content: string;
+  settings: Record<string, unknown>;
+}
+
+export interface EmailTemplate {
+  id: string;
+  templateKey: string;
+  name: string;
+  description: string;
+  subject: string;
+  previewText: string;
+  blocks: EmailBlock[];
+  tenantId: string | null;
+  version: number;
+  isActive: boolean;
+  createdBy?: string;
+  createdAt: string;
+  updatedBy?: string;
+  updatedAt: string;
+}
+
+export interface EmailTemplateVersion {
+  id: string;
+  version: number;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface UpdateEmailTemplateInput {
+  subject?: string;
+  previewText?: string;
+  blocks?: EmailBlock[];
+}
+
+// =========================================================================
+// Integration & Webhook Types
+// =========================================================================
+
+export type WebhookEvent =
+  | 'booking.created'
+  | 'booking.updated'
+  | 'booking.cancelled'
+  | 'payment.received'
+  | 'payment.failed'
+  | 'user.signup'
+  | 'user.updated'
+  | 'pet.created'
+  | 'tenant.created';
+
+export interface Webhook {
+  id: string;
+  name: string;
+  url: string;
+  secret: string;
+  events: WebhookEvent[];
+  headers: Record<string, string>;
+  tenantId: string | null;
+  isActive: boolean;
+  lastDeliveryStatus?: number;
+  lastDeliveryAt?: string;
+  createdAt: string;
+}
+
+export interface WebhookDelivery {
+  id: string;
+  webhookId: string;
+  eventType: WebhookEvent;
+  payload: object;
+  responseStatus: number;
+  responseBody: string;
+  attempts: number;
+  deliveredAt?: string;
+  createdAt: string;
+}
+
+export interface CreateWebhookInput {
+  name: string;
+  url: string;
+  events: WebhookEvent[];
+  headers?: Record<string, string>;
+  tenantId?: string;
+}
+
+export interface UpdateWebhookInput {
+  name?: string;
+  url?: string;
+  events?: WebhookEvent[];
+  headers?: Record<string, string>;
+  isActive?: boolean;
+}
+
+export type IntegrationCategory = 'communication' | 'automation' | 'finance' | 'calendar' | 'marketing';
+
+export interface Integration {
+  id: string;
+  integrationKey: string;
+  name: string;
+  description: string;
+  category: IntegrationCategory;
+  isConnected: boolean;
+  connectedBy?: string;
+  connectedAt?: string;
+}
+
+export interface IntegrationUsageStats {
+  totalRequests24h: number;
+  successRate: number;
+  failedDeliveries: number;
+  avgResponseTime: number;
 }

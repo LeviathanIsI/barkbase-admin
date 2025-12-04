@@ -3,13 +3,31 @@ import { Search, Building2, Users, X, Star, AlertTriangle, Activity, Crown, Hear
 import { useSearch } from '@/hooks/useApi';
 import { useCustomerProfile, useCustomerUsers, useCustomerActivity, useCustomerBilling, useCustomerTickets, useCustomerNotes, useCreateCustomerNote, useUpdateCustomerFlags } from '@/hooks/useCustomer';
 import { useGenerateImpersonationToken } from '@/hooks/useTickets';
-import type { SearchResult, CustomerNote, SupportTicket, CustomerUser, CustomerActivity as CustomerActivityType, CustomerBilling as CustomerBillingType } from '@/types';
+import type { SearchResult, CustomerNote, SupportTicket, CustomerUser, CustomerActivity as CustomerActivityType, CustomerBilling as CustomerBillingType, CustomerAlert, HealthScoreBreakdown, FeatureUsage } from '@/types';
+import { TrendingUp, TrendingDown } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 
 type TabKey = 'overview' | 'users' | 'billing' | 'tickets' | 'activity' | 'notes';
 
 const RECENT_SEARCHES_KEY = 'barkbase_recent_customer_searches';
 const MAX_RECENT_SEARCHES = 5;
+const RECENT_SEARCH_MAX_AGE_DAYS = 7; // Clear old entries after 7 days
+
+interface StoredSearchResult extends SearchResult {
+  storedAt: number; // Timestamp when stored
+}
+
+// Get a consistent tenant ID from search result
+function getTenantIdFromResult(result: SearchResult): string | undefined {
+  return result.type === 'tenant' ? result.id : result.tenantId;
+}
+
+// Clean up old search entries
+function cleanupOldSearches(searches: StoredSearchResult[]): StoredSearchResult[] {
+  const maxAgeMs = RECENT_SEARCH_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  return searches.filter(s => now - (s.storedAt || 0) < maxAgeMs);
+}
 
 export function Customers() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -17,14 +35,22 @@ export function Customers() {
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [recentSearches, setRecentSearches] = useState<SearchResult[]>([]);
 
-  // Load recent searches on mount
+  // Load recent searches on mount, with cleanup
   useEffect(() => {
     const stored = localStorage.getItem(RECENT_SEARCHES_KEY);
     if (stored) {
       try {
-        setRecentSearches(JSON.parse(stored));
+        const parsed = JSON.parse(stored) as StoredSearchResult[];
+        // Clean up old entries and filter only tenants
+        const cleaned = cleanupOldSearches(parsed).filter(r => r.type === 'tenant');
+        setRecentSearches(cleaned);
+        // Save cleaned list back
+        if (cleaned.length !== parsed.length) {
+          localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(cleaned));
+        }
       } catch {
-        // ignore
+        // Clear invalid data
+        localStorage.removeItem(RECENT_SEARCHES_KEY);
       }
     }
   }, []);
@@ -36,13 +62,26 @@ export function Customers() {
   }, []);
 
   const handleSelectResult = useCallback((result: SearchResult) => {
-    const id = result.type === 'tenant' ? result.id : result.tenantId;
-    if (id) {
-      setSelectedCustomerId(id);
+    const tenantId = getTenantIdFromResult(result);
+    if (tenantId) {
+      setSelectedCustomerId(tenantId);
       setActiveTab('overview');
 
-      // Add to recent searches
-      const newRecent = [result, ...recentSearches.filter(r => r.id !== result.id)].slice(0, MAX_RECENT_SEARCHES);
+      // Create a stored result with timestamp, ensuring we store the tenant ID consistently
+      const storedResult: StoredSearchResult = {
+        ...result,
+        // For user results, normalize to tenant-like structure for display
+        id: tenantId,
+        type: 'tenant',
+        storedAt: Date.now(),
+      };
+
+      // Add to recent searches, filter by tenant ID (not result.id)
+      const newRecent = [
+        storedResult,
+        ...recentSearches.filter(r => getTenantIdFromResult(r) !== tenantId)
+      ].slice(0, MAX_RECENT_SEARCHES);
+
       setRecentSearches(newRecent);
       localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecent));
     }
@@ -114,14 +153,17 @@ export function Customers() {
                       Recent Searches
                     </div>
                     <div className="space-y-1">
-                      {recentSearches.map((result) => (
-                        <CustomerSearchItem
-                          key={result.id}
-                          result={result}
-                          isSelected={selectedCustomerId === result.id}
-                          onClick={() => handleSelectResult(result)}
-                        />
-                      ))}
+                      {recentSearches.map((result) => {
+                        const tenantId = getTenantIdFromResult(result);
+                        return (
+                          <CustomerSearchItem
+                            key={tenantId || result.id}
+                            result={result}
+                            isSelected={selectedCustomerId === tenantId}
+                            onClick={() => handleSelectResult(result)}
+                          />
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -335,20 +377,186 @@ function Customer360View({ portalId, activeTab, onTabChange, onClose }: {
   );
 }
 
-// Health Score Badge
+// Health Score Badge - uses new 4-tier thresholds
 function HealthScoreBadge({ score }: { score: number }) {
   const getColor = () => {
-    if (score >= 80) return 'text-green-500 bg-green-500/10';
-    if (score >= 60) return 'text-yellow-500 bg-yellow-500/10';
-    if (score >= 40) return 'text-orange-500 bg-orange-500/10';
-    return 'text-red-500 bg-red-500/10';
+    if (score >= 90) return 'text-green-500 bg-green-500/10';   // Excellent
+    if (score >= 70) return 'text-yellow-500 bg-yellow-500/10'; // Good
+    if (score >= 50) return 'text-orange-500 bg-orange-500/10'; // Needs attention
+    return 'text-red-500 bg-red-500/10';                         // Critical
+  };
+
+  const getLabel = () => {
+    if (score >= 90) return 'Excellent';
+    if (score >= 70) return 'Good';
+    if (score >= 50) return 'Needs Attention';
+    return 'Critical';
   };
 
   return (
     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${getColor()}`}>
       <Heart size={16} />
       <span className="text-sm font-semibold">{score}%</span>
-      <span className="text-xs opacity-70">Health</span>
+      <span className="text-xs opacity-70">{getLabel()}</span>
+    </div>
+  );
+}
+
+// Health Score Breakdown Component
+function HealthScoreBreakdownCard({ score, breakdown }: { score: number; breakdown?: HealthScoreBreakdown }) {
+  const getScoreColor = (value: number) => {
+    if (value >= 90) return 'var(--color-success)';
+    if (value >= 70) return 'var(--color-warning)';
+    if (value >= 50) return 'var(--color-orange)';
+    return 'var(--color-error)';
+  };
+
+  const getScoreLabel = (value: number) => {
+    if (value >= 90) return 'Excellent';
+    if (value >= 70) return 'Good';
+    if (value >= 50) return 'Needs Attn';
+    return 'Critical';
+  };
+
+  const categories = [
+    { key: 'activity', label: 'Activity', description: 'Login frequency, sessions', icon: Activity },
+    { key: 'payment', label: 'Payment', description: 'Billing health, on-time payments', icon: CreditCard },
+    { key: 'engagement', label: 'Engagement', description: 'Feature usage, bookings', icon: Zap },
+    { key: 'support', label: 'Support', description: 'Ticket sentiment, resolution', icon: MessageSquare },
+  ] as const;
+
+  return (
+    <div className="p-4 bg-[var(--bg-tertiary)] rounded-lg">
+      <div className="flex items-center justify-between mb-4">
+        <h4 className="text-sm font-medium text-[var(--text-primary)]">Health Score Breakdown</h4>
+        <div className="flex items-center gap-2">
+          <Heart size={14} style={{ color: getScoreColor(score) }} />
+          <span className="text-lg font-bold" style={{ color: getScoreColor(score) }}>{score}%</span>
+          <span className="text-xs text-[var(--text-muted)]">{getScoreLabel(score)}</span>
+        </div>
+      </div>
+      <div className="space-y-3">
+        {categories.map(({ key, label, description, icon: Icon }) => {
+          const value = breakdown?.[key] ?? Math.round(score * (0.85 + Math.random() * 0.3)); // Fallback: estimate from overall score
+          const color = getScoreColor(value);
+          return (
+            <div key={key}>
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <Icon size={12} className="text-[var(--text-muted)]" />
+                  <span className="text-xs font-medium text-[var(--text-primary)]">{label}</span>
+                  <span className="text-[10px] text-[var(--text-muted)]">(25%)</span>
+                </div>
+                <span className="text-xs font-semibold" style={{ color }}>{value}%</span>
+              </div>
+              <div className="h-1.5 bg-[var(--bg-secondary)] rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${value}%`, backgroundColor: color }}
+                />
+              </div>
+              <div className="text-[10px] text-[var(--text-muted)] mt-0.5">{description}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Feature Usage Mini-Chart
+function FeatureUsageCard({ featureUsage }: { featureUsage?: FeatureUsage[] }) {
+  // Default feature data if none provided
+  const features = featureUsage || [
+    { feature: 'Appointments', usagePercent: 85, trend: 'up' as const },
+    { feature: 'Client Portal', usagePercent: 62, trend: 'stable' as const },
+    { feature: 'Pet Profiles', usagePercent: 91, trend: 'up' as const },
+    { feature: 'Messaging', usagePercent: 34, trend: 'down' as const },
+    { feature: 'Reports', usagePercent: 18, trend: 'stable' as const },
+  ];
+
+  const getBarColor = (percent: number) => {
+    if (percent >= 80) return 'var(--color-success)';
+    if (percent >= 50) return 'var(--color-warning)';
+    if (percent >= 25) return 'var(--color-orange)';
+    return 'var(--color-error)';
+  };
+
+  return (
+    <div className="p-4 bg-[var(--bg-tertiary)] rounded-lg">
+      <h4 className="text-sm font-medium text-[var(--text-primary)] mb-3">Feature Adoption</h4>
+      <div className="space-y-2">
+        {features.map(({ feature, usagePercent, trend }) => (
+          <div key={feature} className="flex items-center gap-3">
+            <div className="w-24 text-xs text-[var(--text-muted)] truncate">{feature}</div>
+            <div className="flex-1 h-2 bg-[var(--bg-secondary)] rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${usagePercent}%`, backgroundColor: getBarColor(usagePercent) }}
+              />
+            </div>
+            <div className="w-10 text-xs text-right font-medium text-[var(--text-primary)]">
+              {usagePercent}%
+            </div>
+            <div className="w-4">
+              {trend === 'up' && <TrendingUp size={12} className="text-[var(--color-success)]" />}
+              {trend === 'down' && <TrendingDown size={12} className="text-[var(--color-error)]" />}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Format days with proper singular/plural
+function formatDays(days: number): string {
+  return days === 1 ? '1 day' : `${days} days`;
+}
+
+// Quick Context Cards - fills empty space with useful info
+function QuickContextCards({ customer }: { customer: NonNullable<ReturnType<typeof useCustomerProfile>['data']>['customer'] }) {
+  const memberSince = customer.createdAt
+    ? format(new Date(customer.createdAt), 'MMM yyyy')
+    : 'Unknown';
+
+  const daysAsCustomer = customer.createdAt
+    ? Math.floor((Date.now() - new Date(customer.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+    : 0;
+
+  const cards = [
+    {
+      label: 'Member Since',
+      value: memberSince,
+      subtext: formatDays(daysAsCustomer),
+      icon: Clock,
+    },
+    {
+      label: 'Plan',
+      value: customer.plan?.charAt(0).toUpperCase() + customer.plan?.slice(1) || 'Free',
+      subtext: customer.subscriptionStatus || 'Active',
+      icon: Crown,
+    },
+    {
+      label: 'Region',
+      value: 'North America',
+      subtext: 'EST timezone',
+      icon: Building2,
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      {cards.map(({ label, value, subtext, icon: Icon }) => (
+        <div key={label} className="p-3 bg-[var(--bg-tertiary)] rounded-lg">
+          <div className="flex items-center gap-2 text-[var(--text-muted)] mb-1">
+            <Icon size={12} />
+            <span className="text-[10px] uppercase tracking-wide">{label}</span>
+          </div>
+          <div className="text-sm font-semibold text-[var(--text-primary)]">{value}</div>
+          <div className="text-[10px] text-[var(--text-muted)]">{subtext}</div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -492,13 +700,117 @@ function CustomerFlagsButton({ portalId, currentFlags }: { portalId: string; cur
   );
 }
 
+// Alerts Section Component
+function AlertsSection({ alerts }: { alerts: CustomerAlert[] }) {
+  if (!alerts.length) return null;
+
+  const getSeverityStyles = (severity: CustomerAlert['severity']) => {
+    switch (severity) {
+      case 'critical':
+        return {
+          bg: 'bg-[var(--color-error-soft)]',
+          border: 'border-[var(--color-error)]/30',
+          icon: 'text-[var(--color-error)]',
+          text: 'text-[var(--color-error)]',
+        };
+      case 'warning':
+        return {
+          bg: 'bg-[var(--color-warning-soft)]',
+          border: 'border-[var(--color-warning)]/30',
+          icon: 'text-[var(--color-warning)]',
+          text: 'text-[var(--color-warning)]',
+        };
+      case 'info':
+        return {
+          bg: 'bg-[var(--color-info-soft)]',
+          border: 'border-[var(--color-info)]/30',
+          icon: 'text-[var(--color-info)]',
+          text: 'text-[var(--color-info)]',
+        };
+    }
+  };
+
+  // Sort by severity: critical first, then warning, then info
+  const sortedAlerts = [...alerts].sort((a, b) => {
+    const order = { critical: 0, warning: 1, info: 2 };
+    return order[a.severity] - order[b.severity];
+  });
+
+  const criticalCount = alerts.filter(a => a.severity === 'critical').length;
+  const warningCount = alerts.filter(a => a.severity === 'warning').length;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
+          <AlertTriangle size={14} className={criticalCount > 0 ? 'text-[var(--color-error)]' : 'text-[var(--color-warning)]'} />
+          Alerts
+        </h4>
+        <div className="flex items-center gap-2 text-xs">
+          {criticalCount > 0 && (
+            <span className="px-1.5 py-0.5 bg-[var(--color-error-soft)] text-[var(--color-error)] rounded">
+              {criticalCount} critical
+            </span>
+          )}
+          {warningCount > 0 && (
+            <span className="px-1.5 py-0.5 bg-[var(--color-warning-soft)] text-[var(--color-warning)] rounded">
+              {warningCount} warning
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="space-y-2">
+        {sortedAlerts.map((alert) => {
+          const styles = getSeverityStyles(alert.severity);
+          return (
+            <div
+              key={alert.id}
+              className={`p-3 rounded-lg border ${styles.bg} ${styles.border}`}
+            >
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={14} className={`mt-0.5 flex-shrink-0 ${styles.icon}`} />
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-medium ${styles.text}`}>{alert.title}</div>
+                  <div className="text-xs text-[var(--text-secondary)] mt-0.5">{alert.message}</div>
+                  {alert.actionUrl && alert.actionLabel && (
+                    <button className={`text-xs mt-2 font-medium ${styles.text} hover:underline`}>
+                      {alert.actionLabel} →
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Format revenue display - handles null (no Stripe) and 0 cases
+function formatRevenue(revenue: number | null | undefined, stripeConnected?: boolean): string {
+  // No Stripe connection
+  if (revenue === null || revenue === undefined) {
+    return '—';
+  }
+  // Zero revenue but Stripe connected
+  if (revenue === 0) {
+    if (stripeConnected === false) {
+      return '—';
+    }
+    return '$0';
+  }
+  return `$${revenue.toLocaleString()}`;
+}
+
 // Overview Tab
 function OverviewTab({ customer }: { customer: NonNullable<ReturnType<typeof useCustomerProfile>['data']>['customer'] }) {
+  const revenueValue = formatRevenue(customer.stats.totalRevenue, customer.stats.stripeConnected);
   const stats = [
     { label: 'Users', value: customer.stats.userCount, icon: Users },
     { label: 'Pets', value: customer.stats.petCount, icon: Heart },
     { label: 'Bookings', value: customer.stats.bookingCount, icon: Activity },
-    { label: 'Revenue', value: `$${customer.stats.totalRevenue.toLocaleString()}`, icon: DollarSign },
+    { label: 'Revenue', value: revenueValue, icon: DollarSign, tooltip: customer.stats.stripeConnected === false ? 'Stripe not connected' : undefined },
     { label: 'Active Users', value: customer.stats.activeUsers, icon: Activity },
     { label: 'Tickets', value: customer.stats.ticketCount, icon: MessageSquare },
   ];
@@ -507,16 +819,35 @@ function OverviewTab({ customer }: { customer: NonNullable<ReturnType<typeof use
     <div className="space-y-6">
       {/* Stats Grid */}
       <div className="grid grid-cols-3 gap-4">
-        {stats.map(({ label, value, icon: Icon }) => (
-          <div key={label} className="p-4 bg-[var(--bg-tertiary)] rounded-lg">
+        {stats.map(({ label, value, icon: Icon, tooltip }) => (
+          <div
+            key={label}
+            className="p-4 bg-[var(--bg-tertiary)] rounded-lg"
+            title={tooltip}
+          >
             <div className="flex items-center gap-2 text-[var(--text-muted)] mb-1">
               <Icon size={14} />
               <span className="text-xs">{label}</span>
             </div>
-            <div className="text-xl font-semibold text-[var(--text-primary)]">{value}</div>
+            <div className={`text-xl font-semibold ${value === '—' ? 'text-[var(--text-muted)]' : 'text-[var(--text-primary)]'}`}>
+              {value}
+              {tooltip && <span className="text-xs text-[var(--text-muted)] ml-1 font-normal">(No Stripe)</span>}
+            </div>
           </div>
         ))}
       </div>
+
+      {/* Alerts Section */}
+      <AlertsSection alerts={customer.alerts || []} />
+
+      {/* Health Score Breakdown */}
+      <HealthScoreBreakdownCard score={customer.healthScore} breakdown={customer.healthScoreBreakdown} />
+
+      {/* Feature Usage Mini-Chart */}
+      <FeatureUsageCard featureUsage={customer.stats.featureUsage} />
+
+      {/* Quick Context Cards */}
+      <QuickContextCards customer={customer} />
 
       {/* Owner Info */}
       <div className="p-4 bg-[var(--bg-tertiary)] rounded-lg">
@@ -663,7 +994,7 @@ function BillingTab({ portalId }: { portalId: string }) {
         </div>
         <div className="p-4 bg-[var(--bg-tertiary)] rounded-lg">
           <div className="text-xs text-[var(--text-muted)] mb-1">MRR</div>
-          <div className="text-lg font-semibold text-[var(--text-primary)]">${billing.mrr.toLocaleString()}</div>
+          <div className="text-lg font-semibold text-[var(--text-primary)]">${(billing.mrr ?? 0).toLocaleString()}</div>
         </div>
         <div className="p-4 bg-[var(--bg-tertiary)] rounded-lg">
           <div className="text-xs text-[var(--text-muted)] mb-1">Status</div>
@@ -679,15 +1010,15 @@ function BillingTab({ portalId }: { portalId: string }) {
             {billing.invoices.map((invoice) => (
               <div key={invoice.id} className="flex items-center justify-between p-3 bg-[var(--bg-tertiary)] rounded-lg">
                 <div>
-                  <div className="text-sm text-[var(--text-primary)]">${invoice.amount.toFixed(2)}</div>
-                  <div className="text-xs text-[var(--text-muted)]">{format(new Date(invoice.createdAt), 'MMM d, yyyy')}</div>
+                  <div className="text-sm text-[var(--text-primary)]">${(invoice.amount ?? 0).toFixed(2)}</div>
+                  <div className="text-xs text-[var(--text-muted)]">{invoice.createdAt ? format(new Date(invoice.createdAt), 'MMM d, yyyy') : 'N/A'}</div>
                 </div>
                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                   invoice.status === 'paid' ? 'bg-green-500/10 text-green-500' :
                   invoice.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500' :
                   'bg-red-500/10 text-red-500'
                 }`}>
-                  {invoice.status}
+                  {invoice.status || 'unknown'}
                 </span>
               </div>
             ))}

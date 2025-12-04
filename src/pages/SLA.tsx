@@ -12,71 +12,34 @@ import {
   Database,
   Globe,
   Shield,
+  Loader2,
 } from 'lucide-react';
 import { SlideOutPanel } from '@/components/ui/SlideOutPanel';
+import {
+  useSlaOverview,
+  useSlaComponents,
+  useSlaCalendar,
+  useSlaIncidents,
+  useSlaCredits,
+  useSlaAlerts,
+  useUpdateSlaAlerts,
+} from '@/hooks/useApi';
+import type {
+  SLAStatus,
+  ComponentStatus,
+  SLAComponent,
+  DayUptime,
+  SLAIncidentImpact,
+  SLAAlertSettings,
+} from '@/types';
 
-type SLAStatus = 'meeting' | 'at_risk' | 'breached';
-type ComponentStatus = 'operational' | 'degraded' | 'partial_outage' | 'major_outage';
-
-interface ComponentUptime {
-  name: string;
-  displayName: string;
-  icon: typeof Activity;
-  currentMonth: number;
-  ytd: number;
-  target: number;
-  status: ComponentStatus;
-}
-
-interface DayUptime {
-  date: string;
-  uptime: number;
-  incidents: number;
-}
-
-interface IncidentImpact {
-  id: string;
-  title: string;
-  date: string;
-  duration: number; // minutes
-  affectedCustomers: number;
-  slaImpact: number; // percentage points
-  creditAmount: number;
-}
-
-const COMPONENTS: ComponentUptime[] = [
-  { name: 'api', displayName: 'API', icon: Globe, currentMonth: 99.98, ytd: 99.95, target: 99.9, status: 'operational' },
-  { name: 'web', displayName: 'Web App', icon: Activity, currentMonth: 99.99, ytd: 99.97, target: 99.9, status: 'operational' },
-  { name: 'database', displayName: 'Database', icon: Database, currentMonth: 99.95, ytd: 99.92, target: 99.9, status: 'operational' },
-  { name: 'auth', displayName: 'Authentication', icon: Shield, currentMonth: 100, ytd: 99.99, target: 99.9, status: 'operational' },
-];
-
-const MOCK_CALENDAR: DayUptime[] = Array.from({ length: 31 }, (_, i) => ({
-  date: `2024-01-${String(i + 1).padStart(2, '0')}`,
-  uptime: 99 + Math.random(),
-  incidents: Math.random() > 0.9 ? 1 : 0,
-}));
-
-const MOCK_INCIDENTS: IncidentImpact[] = [
-  {
-    id: '1',
-    title: 'API Gateway Degradation',
-    date: '2024-01-15',
-    duration: 23,
-    affectedCustomers: 1247,
-    slaImpact: 0.05,
-    creditAmount: 0,
-  },
-  {
-    id: '2',
-    title: 'Database Connection Issues',
-    date: '2024-01-08',
-    duration: 45,
-    affectedCustomers: 3891,
-    slaImpact: 0.10,
-    creditAmount: 0,
-  },
-];
+// Icon mapping for components
+const componentIcons: Record<string, typeof Activity> = {
+  api: Globe,
+  web: Activity,
+  database: Database,
+  auth: Shield,
+};
 
 function getUptimeColor(uptime: number): string {
   if (uptime >= 99.9) return 'var(--color-success)';
@@ -222,14 +185,33 @@ export function SLA() {
   const [showAlertSettings, setShowAlertSettings] = useState(false);
   const [alertThreshold, setAlertThreshold] = useState(0.05);
 
-  // Mock calculations
-  const overallUptime = 99.94;
-  const ytdUptime = 99.93;
-  const slaTarget = 99.9;
-  const status = getSLAStatus(overallUptime, slaTarget);
-  const remainingDowntime = Math.max(0, (100 - slaTarget) - (100 - overallUptime));
-  const remainingMinutes = Math.round((remainingDowntime / 100) * 30 * 24 * 60);
-  const creditsOwed = status === 'breached' ? 500 : 0;
+  // API hooks
+  const { data: overviewData, isLoading: isLoadingOverview } = useSlaOverview();
+  const { data: componentsData, isLoading: isLoadingComponents } = useSlaComponents();
+  const monthStr = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, '0')}`;
+  const { data: calendarData, isLoading: isLoadingCalendar } = useSlaCalendar(monthStr);
+  const { data: incidentsData, isLoading: isLoadingIncidents } = useSlaIncidents();
+  const { data: creditsData } = useSlaCredits();
+  const { data: alertsData } = useSlaAlerts();
+  const updateAlerts = useUpdateSlaAlerts();
+
+  const isLoading = isLoadingOverview || isLoadingComponents || isLoadingCalendar || isLoadingIncidents;
+
+  // Extract data from API responses
+  const overview = overviewData?.overview;
+  const components = componentsData?.components || [];
+  const calendar = calendarData?.calendar || [];
+  const incidents = incidentsData?.incidents || [];
+  const credits = creditsData?.credits;
+  const alertSettings = alertsData?.settings;
+
+  // Use API data or defaults
+  const overallUptime = overview?.overallUptime ?? 99.9;
+  const ytdUptime = overview?.ytdUptime ?? 99.9;
+  const slaTarget = overview?.target ?? 99.9;
+  const status = overview?.status ?? getSLAStatus(overallUptime, slaTarget);
+  const remainingMinutes = overview?.remainingMinutes ?? 0;
+  const creditsOwed = overview?.creditsOwed ?? 0;
 
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
                       'July', 'August', 'September', 'October', 'November', 'December'];
@@ -244,6 +226,19 @@ export function SLA() {
     // Would generate PDF report
     alert('Report generation started. You will receive an email when ready.');
   };
+
+  const handleUpdateAlertThreshold = (threshold: number) => {
+    setAlertThreshold(threshold);
+    updateAlerts.mutate({ thresholdPercent: threshold });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--color-brand)]" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -361,15 +356,15 @@ export function SLA() {
               </button>
             </div>
           </div>
-          <CalendarHeatmap data={MOCK_CALENDAR} onDayClick={setSelectedDay} />
+          <CalendarHeatmap data={calendar} onDayClick={setSelectedDay} />
         </div>
 
         {/* Component Status */}
         <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-4">
           <h3 className="text-sm font-medium text-[var(--text-primary)] mb-4">Component Status</h3>
           <div className="space-y-3">
-            {COMPONENTS.map(component => {
-              const Icon = component.icon;
+            {components.map((component: SLAComponent) => {
+              const Icon = componentIcons[component.name] || Activity;
               const componentStatus = getSLAStatus(component.currentMonth, component.target);
               return (
                 <div key={component.name} className="p-3 bg-[var(--bg-tertiary)] rounded-lg">
@@ -412,7 +407,7 @@ export function SLA() {
       <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg">
         <div className="px-4 py-3 border-b border-[var(--border-primary)] flex items-center justify-between">
           <h3 className="text-sm font-medium text-[var(--text-primary)]">Incident Impact Analysis</h3>
-          <span className="text-xs text-[var(--text-muted)]">{MOCK_INCIDENTS.length} incidents this month</span>
+          <span className="text-xs text-[var(--text-muted)]">{incidents.length} incidents this month</span>
         </div>
         <table className="w-full">
           <thead>
@@ -426,7 +421,7 @@ export function SLA() {
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border-primary)]">
-            {MOCK_INCIDENTS.map(incident => (
+            {incidents.map((incident: SLAIncidentImpact) => (
               <tr key={incident.id} className="hover:bg-[var(--hover-overlay)]">
                 <td className="px-4 py-3">
                   <span className="text-sm font-medium text-[var(--text-primary)]">{incident.title}</span>
@@ -487,7 +482,7 @@ export function SLA() {
               <div>
                 <h4 className="text-sm font-medium text-[var(--text-primary)] mb-3">Incidents on this day</h4>
                 <div className="space-y-2">
-                  {MOCK_INCIDENTS.filter(i => i.date === selectedDay.date).map(incident => (
+                  {incidents.filter((i: SLAIncidentImpact) => i.date === selectedDay.date).map((incident: SLAIncidentImpact) => (
                     <div key={incident.id} className="p-3 bg-[var(--bg-tertiary)] rounded-lg">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-[var(--text-primary)]">{incident.title}</span>

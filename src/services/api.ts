@@ -95,6 +95,23 @@ import type {
   WhiteLabelStats,
   WhiteLabelHistoryEntry,
   UpdateWhiteLabelInput,
+  TenantHealthScore,
+  HealthScoreStats,
+  ChurnAlert,
+  SLAOverview,
+  SLAComponent,
+  DayUptime,
+  SLAIncidentImpact,
+  SLAAlertSettings,
+  EmailTemplate,
+  EmailTemplateVersion,
+  UpdateEmailTemplateInput,
+  Webhook,
+  WebhookDelivery,
+  CreateWebhookInput,
+  UpdateWebhookInput,
+  Integration,
+  IntegrationUsageStats,
 } from '@/types';
 
 class ApiClient {
@@ -1067,6 +1084,154 @@ class ApiClient {
     return this.request(API_ENDPOINTS.whiteLabelVerifyDomain(tenantId), {
       method: 'POST',
     });
+  }
+
+  // Customer Health endpoints
+  async getHealthScores(params?: { filter?: string }): Promise<{ scores: TenantHealthScore[] }> {
+    const queryParams = params?.filter ? `?filter=${params.filter}` : '';
+    return this.request(`${API_ENDPOINTS.healthScores}${queryParams}`);
+  }
+
+  async getHealthScoresStats(): Promise<{ stats: HealthScoreStats }> {
+    return this.request(API_ENDPOINTS.healthScoresStats);
+  }
+
+  async getHealthScore(tenantId: string): Promise<{ score: TenantHealthScore }> {
+    return this.request(API_ENDPOINTS.healthScore(tenantId));
+  }
+
+  async getChurnAlerts(params?: { acknowledged?: boolean }): Promise<{ alerts: ChurnAlert[] }> {
+    const queryParams = params?.acknowledged !== undefined ? `?acknowledged=${params.acknowledged}` : '';
+    return this.request(`${API_ENDPOINTS.churnAlerts}${queryParams}`);
+  }
+
+  async acknowledgeChurnAlert(id: string): Promise<{ success: boolean }> {
+    return this.request(API_ENDPOINTS.churnAlertAcknowledge(id), {
+      method: 'POST',
+    });
+  }
+
+  // SLA endpoints
+  async getSlaOverview(): Promise<{ overview: SLAOverview }> {
+    return this.request(API_ENDPOINTS.slaOverview);
+  }
+
+  async getSlaComponents(): Promise<{ components: SLAComponent[] }> {
+    return this.request(API_ENDPOINTS.slaComponents);
+  }
+
+  async getSlaCalendar(month?: string): Promise<{ calendar: DayUptime[] }> {
+    const queryParams = month ? `?month=${month}` : '';
+    return this.request(`${API_ENDPOINTS.slaCalendar}${queryParams}`);
+  }
+
+  async getSlaIncidents(): Promise<{ incidents: SLAIncidentImpact[] }> {
+    return this.request(API_ENDPOINTS.slaIncidents);
+  }
+
+  async getSlaCredits(): Promise<{ credits: { total: number; pending: number; applied: number } }> {
+    return this.request(API_ENDPOINTS.slaCredits);
+  }
+
+  async getSlaAlerts(): Promise<{ settings: SLAAlertSettings }> {
+    return this.request(API_ENDPOINTS.slaAlerts);
+  }
+
+  async updateSlaAlerts(settings: Partial<SLAAlertSettings>): Promise<{ success: boolean }> {
+    return this.request(API_ENDPOINTS.slaAlerts, {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    });
+  }
+
+  // Email Template endpoints
+  async getEmailTemplates(): Promise<{ templates: EmailTemplate[] }> {
+    return this.request(API_ENDPOINTS.emailTemplates);
+  }
+
+  async getEmailTemplate(id: string): Promise<{ template: EmailTemplate }> {
+    return this.request(API_ENDPOINTS.emailTemplate(id));
+  }
+
+  async updateEmailTemplate(id: string, data: UpdateEmailTemplateInput): Promise<{ template: EmailTemplate }> {
+    return this.request(API_ENDPOINTS.emailTemplate(id), {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getEmailTemplateVersions(id: string): Promise<{ versions: EmailTemplateVersion[] }> {
+    return this.request(API_ENDPOINTS.emailTemplateVersions(id));
+  }
+
+  async restoreEmailTemplateVersion(id: string, version: number): Promise<{ template: EmailTemplate }> {
+    return this.request(API_ENDPOINTS.emailTemplateRestore(id, version), {
+      method: 'POST',
+    });
+  }
+
+  async sendTestEmail(id: string, email: string): Promise<{ success: boolean; message: string }> {
+    return this.request(API_ENDPOINTS.emailTemplateTest(id), {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  // Webhook endpoints
+  async getWebhooks(): Promise<{ webhooks: Webhook[] }> {
+    return this.request(API_ENDPOINTS.webhooks);
+  }
+
+  async createWebhook(data: CreateWebhookInput): Promise<{ webhook: Webhook }> {
+    return this.request(API_ENDPOINTS.webhooks, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateWebhook(id: string, data: UpdateWebhookInput): Promise<{ webhook: Webhook }> {
+    return this.request(API_ENDPOINTS.webhook(id), {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteWebhook(id: string): Promise<{ success: boolean }> {
+    return this.request(API_ENDPOINTS.webhook(id), {
+      method: 'DELETE',
+    });
+  }
+
+  async testWebhook(id: string): Promise<{ success: boolean; status: number; message: string }> {
+    return this.request(API_ENDPOINTS.webhookTest(id), {
+      method: 'POST',
+    });
+  }
+
+  async getWebhookDeliveries(id: string): Promise<{ deliveries: WebhookDelivery[] }> {
+    return this.request(API_ENDPOINTS.webhookDeliveries(id));
+  }
+
+  // Integration endpoints
+  async getIntegrations(): Promise<{ integrations: Integration[] }> {
+    return this.request(API_ENDPOINTS.integrations);
+  }
+
+  async connectIntegration(key: string, config: Record<string, unknown>): Promise<{ success: boolean }> {
+    return this.request(API_ENDPOINTS.integrationConnect(key), {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+  }
+
+  async disconnectIntegration(key: string): Promise<{ success: boolean }> {
+    return this.request(API_ENDPOINTS.integrationDisconnect(key), {
+      method: 'DELETE',
+    });
+  }
+
+  async getIntegrationUsage(): Promise<{ usage: IntegrationUsageStats }> {
+    return this.request(API_ENDPOINTS.integrationUsage);
   }
 
 }
